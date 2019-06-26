@@ -52,3 +52,9 @@ $chmod u+x ./shell.sh
 $./shell.sh /dev/ttyUSB0
 
 ----------------
+
+
+# git and all
+
+please make a branch for your changes,
+keep your branches name significant
