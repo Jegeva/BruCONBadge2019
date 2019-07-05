@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <assert.h>
 
 int main(int argc,char** argv)
 {
@@ -11,15 +13,18 @@ int main(int argc,char** argv)
     int fd = open(argv[1],O_RDONLY);
     struct stat mstat;
     fstat(fd,&mstat);
-    unsigned char * mem = (char*)calloc(mstat.st_size,sizeof(char));
+    unsigned char * mem = (unsigned char*)calloc(mstat.st_size,sizeof(char));
 
-    read(fd,mem,mstat.st_size);
+    int n = read(fd,mem,mstat.st_size);
+    assert(n == mstat.st_size);
     unsigned char * ptr = mem ;
-    uint16_t res,res0,res1;
+    uint16_t res;
     int i;
 
+    (void) argc; /* unused */
+
     i=122;
-    printf("uint16_t %s[%d]={\n",argv[1],(mstat.st_size-122)/3);
+    printf("uint16_t %s[%d]={\n",argv[1],(int)(mstat.st_size-122)/3);
 
     while( i < (mstat.st_size-3) ){
         res = (*(ptr+i)>>2) | (*(ptr+i+1)>>2)<<4 | (*(ptr+i+2)>>2)<<8  ;
