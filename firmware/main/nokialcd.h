@@ -199,6 +199,17 @@ void lcd_on(void);
 void lcd_sync(void);
 void bruconlogo();
 
+typedef uint16_t pixel_t;
+
+typedef struct image_s {
+    int w;
+    int h;
+    pixel_t buffer[];
+} image_t;
+
+void draw_pixel(int x, int y, pixel_t color, unsigned int blend);
+void draw_image(const image_t * img, int x, int y);
+
 extern volatile char preventbacklighttimeoutTask ;
 
 static unsigned char FONT8x16[97][16]  = {

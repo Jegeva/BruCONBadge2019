@@ -86,8 +86,6 @@ void lcd_send_bit_buffer(spi_device_handle_t spi, bit_buffer_t *bb)
 }
 
 
-typedef uint16_t pixel_t;
-
 #define get_nibble(x, n)     (((x) >> (n * 4)) & 0x0f)
 #define nibble(x, n)         (((x) & 0x0f) << (n * 4))
 #define set_nibble(a, x, n)  (((a) & ~(0x0f << (n * 4)) & 0xffff) | nibble((x), (n)))
@@ -126,6 +124,33 @@ void draw_pixel(int x, int y, pixel_t color, unsigned int blend)
     *dst = pixel_blend(*dst, color, blend);
 }
 
+static bool intersect(int x1, int y1, int w1, int h1,
+                      int x2, int y2, int w2, int h2,
+                      int * xr, int * yr, int * wr, int * hr)
+{
+    int x3 = x1 + w1, y3 = y1 + h1, x4 = x2 + w2, y4 = y2 + h2;
+    *xr = max(x1, x2); *wr = min(x3 - *xr, x4 - *xr);
+    *yr = max(y1, y2); *hr = min(y3 - *yr, y4 - *yr);
+    if (*wr <= 0 || *hr <= 0) { /* no overlap */
+        *xr = 0; *yr = 0; *wr = 0; *hr = 0;
+        return false;
+    }
+    return true;
+}
+
+void draw_image(const image_t * img, int x, int y)
+{
+    int dx, dy, dw, dh;
+
+    if (intersect(0, 0, ROW_LENGTH, COL_HEIGHT, x, y, img->w, img->h, &dx, &dy, &dw, &dh)) {
+        const pixel_t * src = img->buffer + ((dy - y) * img->w) + (dx - x);
+        pixel_t * dst = frame + (dy * ROW_LENGTH) + dx;
+
+        for (; dh; dh--, src += img->w - dw, dst += ROW_LENGTH - dw)
+            for (int i = dw; i; i--, dst++, src++)
+                *dst = pixel_blend(*dst, *src, 0xf);
+    }
+}
 
 static bit_buffer_t *line_buffer;
 
