@@ -2,10 +2,17 @@
 CC = gcc
 CFLAGS += -std=gnu99 -I. -O3 -Wall -Wextra -pedantic -Werror
 LDFLAGS += -lm
+FTCONFIG = freetype-config
 
-TOOLS = img2h bmp888to12bits
+TOOLS = img2h font2h bmp888to12bits
 
 all: $(TOOLS)
+
+font2h.o: font2h.c
+	$(CC) $(CFLAGS) $(shell $(FTCONFIG) --cflags) -c $< -o $@
+
+font2h: font2h.o
+	$(CC) $(CFLAGS) -o $@ $< $(shell $(FTCONFIG) --libs)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
