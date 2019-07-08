@@ -103,7 +103,6 @@ void wifitimeoutTask()
 
 void gui()
 {
-  TRIG;
   init_lcd(PHILLIPS);
   char * tut = calloc(50,1);
     rtc_wdt_disable();
@@ -148,7 +147,8 @@ void gui()
           }
       }
       *(tut+16)=0;
-      lcd_setStr(tut,0,0,BLACK,B12_WHITE,1,0);
+      lcd_setStr(tut,116,0,BLACK,B12_WHITE,1,0);
+      lcd_sync();
       vTaskDelay(500 / portTICK_PERIOD_MS);
       break;
 
@@ -157,7 +157,8 @@ void gui()
             bruconlogo();
             sprintf(tut,"Enrolling...");
             *(tut+16)=0;
-            lcd_setStr(tut,0,0,BLACK,B12_WHITE,1,0);
+            lcd_setStr(tut,116,0,BLACK,B12_WHITE,1,0);
+            lcd_sync();
             vTaskDelay(500 / portTICK_PERIOD_MS);
         } else {
             if(getBruCONConfigFlag("haveClientCert")==0){
@@ -195,7 +196,8 @@ void gui()
                 bruconlogo();
                 sprintf(tut,"get sched:%d/%d",get_sched_attempt,get_sched_max_attempt);
                 *(tut+16)=0;
-                lcd_setStr(tut,0,0,BLACK,B12_WHITE,1,0);
+                lcd_setStr(tut,116,0,BLACK,B12_WHITE,1,0);
+                lcd_sync();
                 vTaskDelay(500 / portTICK_PERIOD_MS);
             } else {
                 printf("get sched:%d/%d\n",++get_sched_attempt,get_sched_max_attempt);
