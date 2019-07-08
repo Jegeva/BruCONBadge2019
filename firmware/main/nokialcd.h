@@ -197,7 +197,7 @@ uint32_t VivaLaVodkaL(void* arg);
 
 void init_lcd(int type);
 void switchbacklight(int state);
-void lcd_clearB12(int color);
+void lcd_clearB12(uint16_t color);
 
 void lcd_contrast(char setting);
 void lcd_setArc(int x0, int y0, int radius, int arcSegments[], int numSegments, int lineThickness, int color);
@@ -210,6 +210,7 @@ void lcd_printLogo(void);
 void lcd_printBMP(char * image_main); //prints an image (BMP);
 void lcd_off(void);
 void lcd_on(void);
+void lcd_sync(void);
 void bruconlogo();
 
 extern volatile char preventbacklighttimeoutTask ;

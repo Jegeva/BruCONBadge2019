@@ -55,6 +55,7 @@ void MapWest(void* arg){
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
     MapWestL(arg);
+    lcd_sync();
     skeleton_inited = 0;
 }
 
@@ -62,6 +63,7 @@ void MapNovo(void* arg){
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
     MapNovoL(arg);
+    lcd_sync();
     skeleton_inited = 0;
 }
 
@@ -125,6 +127,8 @@ void dispSchedItem(void* arg){
     free(wrkstr);
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
+
+    lcd_sync();
 }
 
 
@@ -247,7 +251,7 @@ void manage_click_menu(uint32_t value,uint32_t level ){
         lcd_setRect(((oldrank%7)+1)*16,0, ((oldrank%7)+1)*16,131, 1, 0);
         lcd_setRect(((currselected%7)+1)*16,0,((currselected%7)+1)*16,131, 1, 0);
         menu_dirty=0;
-
+        lcd_sync();
     }
 }
 void * menuAuthorisedFuncByName(char * funcname){
@@ -424,8 +428,7 @@ void display_skeleton()
     for(i=1;i<8;i++)
         lcd_setRect(i*16,0, i*16,131, 1, 0);
 
-
-
+    lcd_sync();
 }
 
 gpio_num_t pins_buttons[7] = { 
