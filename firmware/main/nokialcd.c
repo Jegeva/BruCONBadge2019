@@ -86,6 +86,46 @@ void lcd_send_bit_buffer(spi_device_handle_t spi, bit_buffer_t *bb)
 }
 
 
+typedef uint16_t pixel_t;
+
+#define get_nibble(x, n)     (((x) >> (n * 4)) & 0x0f)
+#define nibble(x, n)         (((x) & 0x0f) << (n * 4))
+#define set_nibble(a, x, n)  (((a) & ~(0x0f << (n * 4)) & 0xffff) | nibble((x), (n)))
+
+static pixel_t pixel_blend(pixel_t a, pixel_t b, unsigned int blend)
+{
+    unsigned int aa = get_nibble(a, 3);
+    unsigned int ab = (get_nibble(b, 3) * (blend + 1) >> 4);
+
+    b = set_nibble(b, ab, 3);
+
+    if (ab == 0xf)        /* b is covering a */
+        return b;
+    else if (ab == 0)     /* b is invisible */
+        return a;
+    else if (aa == 0)     /* a is invisble */
+        return b;
+    else if (aa == 0xf)   /* a is opaque */
+        return nibble(0xf, 3) |
+            nibble(((get_nibble(b, 2) * (ab + 1)) >> 4) + ((get_nibble(a, 2) * (16 - ab)) >> 4), 2) | /* R */
+            nibble(((get_nibble(b, 1) * (ab + 1)) >> 4) + ((get_nibble(a, 1) * (16 - ab)) >> 4), 1) | /* G */
+            nibble(((get_nibble(b, 0) * (ab + 1)) >> 4) + ((get_nibble(a, 0) * (16 - ab)) >> 4), 0);  /* B */
+                          /* both a & b have alpha */
+    return nibble(max(aa, ab), 3) |
+        nibble(((get_nibble(b, 2) * ab) / (aa + ab)) + ((get_nibble(a, 2) * aa) / (aa + ab)), 2) |    /* R */
+        nibble(((get_nibble(b, 1) * ab) / (aa + ab)) + ((get_nibble(a, 1) * aa) / (aa + ab)), 1) |    /* G */
+        nibble(((get_nibble(b, 0) * ab) / (aa + ab)) + ((get_nibble(a, 0) * aa) / (aa + ab)), 0);     /* B */
+}
+
+void draw_pixel(int x, int y, pixel_t color, unsigned int blend)
+{
+    if(x < 0 || y < 0 || x > ROW_LENGTH - 1 || y > COL_HEIGHT - 1)
+        return;
+
+    pixel_t * dst = frame + (y * COL_HEIGHT) + x;
+    *dst = pixel_blend(*dst, color, blend);
+}
+
 
 static bit_buffer_t *line_buffer;
 
