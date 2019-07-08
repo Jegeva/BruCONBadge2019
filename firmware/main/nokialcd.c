@@ -1,6 +1,5 @@
 #include "./nokialcd.h"
 #include "./brucon.h"
-#include "./test.h"
 #include "map.h"
 #include "westvleteren.h"
 #include "brucon_adc.h"
@@ -109,11 +108,10 @@ void init_lcd(int type)
     driver = type;
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask =  (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) | (1ULL<<LCD_RST) |  (1ULL<<LCD_CS)|  (1ULL<<TRIGLA);
+    io_conf.pin_bit_mask =  (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) | (1ULL<<LCD_RST) |  (1ULL<<LCD_CS);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
-    TRIG;
 
     LCD_SCK_L;
     LCD_DIO_L;
@@ -148,7 +146,7 @@ void init_lcd(int type)
     gpio_config_t io_conf2={
         .intr_type = GPIO_PIN_INTR_DISABLE,
         .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) |  (1ULL<<LCD_RST) |  (1ULL<<LCD_CS)|  (1ULL<<TRIGLA),
+        .pin_bit_mask = (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) |  (1ULL<<LCD_RST) |  (1ULL<<LCD_CS),
         .pull_down_en = 0,
         .pull_up_en = 0
     };
@@ -184,7 +182,6 @@ void init_lcd(int type)
 
 void do_spi_init()
 {
-    TRIG;
     LCD_CS_H;
     dl_us(10);
     LCD_RST_L;
