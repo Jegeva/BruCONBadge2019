@@ -1,7 +1,7 @@
-#include "./nokialcd.h"
-#include "./brucon.h"
-#include "map.h"
-#include "westvleteren.h"
+#include "nokialcd.h"
+#include "img_brucon.h"
+#include "img_map.h"
+#include "img_westvleteren.h"
 #include "brucon_adc.h"
 #include "brucon_nvs.h"
 
@@ -274,7 +274,7 @@ void do_spi_init()
     }
 }
 
-void go_framep(uint16_t *p)
+void lcd_sync()
 {
     bit_buffer_clear(line_buffer);
     bit_buffer_add(line_buffer, 9, CMD((driver == EPSON ? PASET : PASETP)));
@@ -286,27 +286,22 @@ void go_framep(uint16_t *p)
     bit_buffer_add(line_buffer, 9, CMD((driver == EPSON ? RAMWR : RAMWRP)));
     lcd_send_bit_buffer(spi, line_buffer);
 
-    for (unsigned int y = 0; y < COL_HEIGHT; y++) {
+    uint16_t * p = frame;
+    for (int y = 0; y < COL_HEIGHT; y++) {
         bit_buffer_clear(line_buffer);
-        for (unsigned int x = 0; x < ROW_LENGTH; x += 2, p += 2) {
-            bit_buffer_add(line_buffer, 9, 0x100 | (((*p) >> 4) & 0xff));
-            bit_buffer_add(line_buffer, 9, 0x100 | ((*p & 0x0F) << 4) | (*(p + 1) >> 8));
-            bit_buffer_add(line_buffer, 9, 0x100 | (*(p + 1) & 0xff));
+        for (int x = 0; x < ROW_LENGTH; x += 2, p += 2) {
+            bit_buffer_add(line_buffer, 9, DATA((((*p) >> 4) & 0xff)));
+            bit_buffer_add(line_buffer, 9, DATA(((*p & 0x0F) << 4) | ((*(p + 1) >> 8) & 0x0F)));
+            bit_buffer_add(line_buffer, 9, DATA((*(p + 1) & 0xff)));
         }
         lcd_send_bit_buffer(spi, line_buffer);
         bit_buffer_clear(line_buffer);
     }
 }
 
-void lcd_sync()
-{
-    go_framep(frame);
-}
-
 void bruconlogo()
 {
-    memcpy(frame, bruconbmp, sizeof(frame));
-    //lcd_sync();
+    draw_image(&img_brucon, 0, 0);
 }
 
 #define RAND_NR_STR 13
@@ -394,23 +389,20 @@ uint32_t VivaLaVodkaL(void* arg){
     return score;
 }
 
-void MapWestL(void* arg){
-    memcpy(frame, westvleterenbmp, sizeof(frame));
-    //lcd_sync();
-};
+void MapWestL(void* arg)
+{
+    draw_image(&img_westvleteren, 0, 0);
+}
 
-void MapNovoL(void* arg){
-    memcpy(frame, mapbmp, sizeof(frame));
-    //lcd_sync();
-};
-
+void MapNovoL(void* arg)
+{
+    draw_image(&img_map, 0, 0);
+}
 
 void lcd_clearB12(uint16_t color)
 {
     for (uint16_t * p = frame; p < frame + (ROW_LENGTH * COL_HEIGHT); p++)
         *p = color;
-
-    //lcd_sync();
 }
 
 void lcd_contrast(char setting) {
@@ -572,8 +564,6 @@ void lcd_setRect(int x0, int y0, int x1, int y1, unsigned char fill, int color)
         lcd_setLine(x0, y0, x0, y1, color);
         lcd_setLine(x1, y0, x1, y1, color);
     }
-
-    //lcd_sync();
 }
 
 void lcd_printLogo(void){};
