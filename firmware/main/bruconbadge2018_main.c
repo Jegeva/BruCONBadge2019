@@ -147,7 +147,7 @@ void gui()
           }
       }
       *(tut+16)=0;
-      lcd_setStr(tut,116,0,BLACK,B12_WHITE,1,0);
+      lcd_setStr(tut,116,0,B12_BLACK,B12_WHITE,1,0);
       lcd_sync();
       vTaskDelay(500 / portTICK_PERIOD_MS);
       break;
@@ -157,7 +157,7 @@ void gui()
             bruconlogo();
             sprintf(tut,"Enrolling...");
             *(tut+16)=0;
-            lcd_setStr(tut,116,0,BLACK,B12_WHITE,1,0);
+            lcd_setStr(tut,116,0,B12_BLACK,B12_WHITE,1,0);
             lcd_sync();
             vTaskDelay(500 / portTICK_PERIOD_MS);
         } else {
@@ -196,7 +196,7 @@ void gui()
                 bruconlogo();
                 sprintf(tut,"get sched:%d/%d",get_sched_attempt,get_sched_max_attempt);
                 *(tut+16)=0;
-                lcd_setStr(tut,116,0,BLACK,B12_WHITE,1,0);
+                lcd_setStr(tut,116,0,B12_BLACK,B12_WHITE,1,0);
                 lcd_sync();
                 vTaskDelay(500 / portTICK_PERIOD_MS);
             } else {

@@ -2,6 +2,7 @@
 #include "img_brucon.h"
 #include "img_map.h"
 #include "img_westvleteren.h"
+#include "font_opensans_10.h"
 #include "brucon_adc.h"
 #include "brucon_nvs.h"
 
@@ -122,6 +123,111 @@ void draw_pixel(int x, int y, pixel_t color, unsigned int blend)
 
     pixel_t * dst = frame + (y * COL_HEIGHT) + x;
     *dst = pixel_blend(*dst, color, blend);
+}
+
+static inline font_char_t * get_font_char(const font_t *font, int ch)
+{
+    /* If a character is out of range, the first will be returned. Usually it's space (' '). */
+    ch = min(font->max, ch);
+    ch -= font->min;
+    ch = max(0, ch);
+    return (font_char_t *)(font->data + font->lookup[ch]);
+}
+
+int string_width(const font_t * font, const char * str)
+{
+    if (!str)
+        return 0;
+
+    int result = 0;
+    while (*str)
+        result += get_font_char(font, *str++)->advance;
+
+    return result;
+}
+
+void draw_string(const font_t * font, int x, int y, pixel_t color, const char * str)
+{
+    if (!str)
+        return;
+
+    while (*str) {
+        font_char_t * fc = get_font_char(font, *str++);
+        for (int cy = 0, cc = 0; cy < fc->h; cy++)
+            for (int cx = 0; cx < fc->w; cx++, cc++)
+                draw_pixel(x + cx + fc->left, y + cy - fc->top, color,
+                        (fc->buffer[cc / 4] >> ((cc % 4) * 4)) & 0x0f);
+
+        x += fc->advance;
+    }
+}
+
+void draw_string_aligned(const font_t * font, int x, int y, int w, int h,
+        pixel_t color, unsigned int flags, const char *str)
+{
+    char l[1024];
+    char * lines[16]; // Max 16 lines
+    int line = 1;
+
+    if (!str || (w <= 0) || (h <= 0))
+        return;
+
+    strcpy(l, str);
+    lines[0] = l;
+
+    if (flags & WRAP) {
+        char * last_space = NULL;
+        char * p = l;
+
+        while (*p) {
+            if (*p == '\n') {                 /* linebreak */
+                *p = '\0';
+                lines[line++] = ++p;
+                last_space = NULL;
+                continue;
+            }
+            else if (*p == ' ') {             /* space, check wrapping */
+                *p = '\0';
+                if (string_width(font, lines[line - 1]) > w) {  /* wrap ! */
+                    if (last_space == NULL)   /* no space on this line */
+                        p++;
+                    else {                    /* wrap at previous space */
+                        *p = ' ';
+                        *last_space = '\0';
+                        p = last_space + 1;
+                    }
+                    lines[line++] = p;
+                    last_space = NULL;
+                    continue;
+                }
+                last_space = p;
+                *p = ' ';
+            }
+            p++;
+        }
+        if (string_width(font, lines[line - 1]) > w) {
+            /* Final line too long -> wrap once more */
+            if (last_space != NULL) {         /* wrap at previous space */
+                *last_space = '\0';
+                lines[line++] = last_space + 1;
+            }
+        }
+    }
+
+    switch (flags & ALIGN_V) {
+        case TOP:      y += font->height;  break;
+        case VCENTER:  y += (font->height + h - (font->height * (line - 1))) / 2;  break;
+        case BOTTOM:   y += h - (font->height * (line - 1));  break;
+    }
+
+    for (int i = 0; i < line; i++) {
+        int px = x;
+        switch (flags & ALIGN_H) {
+            case CENTER:  px += (w - string_width(font, lines[i])) / 2;  break;
+            case RIGHT:   px += w - string_width(font, lines[i]);  break;
+        }
+        draw_string(font, px, y + i * font->height, color, lines[i]);
+    }
 }
 
 static bool intersect(int x1, int y1, int w1, int h1,
@@ -339,7 +445,7 @@ uint32_t VivaLaVodkaL(void* arg){
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
     gpio_set_level(PIN_HEATER_ALC,1);
-    lcd_clearB12(0);
+    lcd_clearB12(B12_BLACK);
     lcd_setStr("DrinkResponsibly",2,0,B12_WHITE,0,1,0);
     lcd_setStr("  This is a TOY",18,0,B12_WHITE,0,1,0);
     lcd_setStr(" DO NOT TRUST IT",34,0,B12_RED,0,1,0);
@@ -426,71 +532,14 @@ void lcd_contrast(char setting) {
 void lcd_setArc(int x0, int y0, int radius, int arcSegments[], int numSegments, int lineThickness, int color){};
 void lcd_setCircle (int x0, int y0, int radius, int color, int lineThickness){};
 
-void lcd_setChar(char c, int x, int y, int fColor, int bColor, char transp)
-{
-	int             i,j;
-	unsigned int    nCols;
-	unsigned int    nRows;
-	unsigned int    nBytes;
-	unsigned char   PixelRow;
-	unsigned char   Mask;
-	unsigned int    Word0;
-	const unsigned char   *pFont;
-	const unsigned char   *pChar;
-
-
-	// get pointer to the beginning of the selected font table
-	pFont = (const unsigned char *)FONT8x16;
-	// get the nColumns, nRows and nBytes
-	nCols = *(pFont);
-	nRows = *(pFont + 1);
-	nBytes = *(pFont + 2);
-	// get pointer to the last byte of the desired character
-	pChar = pFont + (nBytes * (c - 0x1F)) /*+ nBytes - 1 */ ;
-
-    pChar += nBytes-1;  // stick pChar at the end of the row - gonna reverse print on phillips
-    for (i = 0; i < nRows; i++) {
-        PixelRow = *(pChar++);
-        Mask = 0x80;
-        for (j = 0; j < nCols; j++)
-        {
-            // if pixel bit set, use foreground color; else use the background color
-            if ((PixelRow & Mask) == 0)
-                Word0 = bColor;
-            else
-                Word0 = fColor;
-            Mask = Mask >> 1;
-            if ((i + x) < ROW_LENGTH && (j + y) < COL_HEIGHT)
-                frame[((i + x)) * ROW_LENGTH + (j + y)] = Word0;
-        }
-    }
-}
-
-
 void lcd_setStr(char *pString, int x, int y, int fColor, int bColor, char uselastfill, char newline)
 {
-    int originalY = y;
+    const font_t *f = &font_opensans_10;
 
-    // loop until null-terminator is seen
-    while (*pString != 0x00) {
-        // draw the character
-        lcd_setChar(*pString++, x, y, fColor, bColor,uselastfill);
-        // advance the y position
-        y = y + 8;
-        // bail out if y exceeds 131
-
-        if ((y > 131) ) {
-            if(newline){
-                x = x + 16;
-                y = originalY;
-            } else {
-                break;
-            }
-        }
-        if (x > 131) break;
-    }
-
-    //lcd_sync();
+    if (!newline)
+        draw_string(f, y, x + f->height, fColor, pString);
+    else
+        draw_string_aligned(f, y + 2, x, ROW_LENGTH - y - 4, COL_HEIGHT - x, fColor, WRAP | CENTER | TOP, pString);
 }
 
 static void setPixel(int color, unsigned char x, unsigned char y)
@@ -570,3 +619,5 @@ void lcd_printLogo(void){};
 void lcd_printBMP(char * image_main){}; //prints an image (BMP);
 void lcd_off(void){};
 void lcd_on(void){};
+
+// vim: expandtab:ts=4:sw=4
