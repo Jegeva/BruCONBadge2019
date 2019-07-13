@@ -55,6 +55,7 @@ void MapWest(void* arg){
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
     MapWestL(arg);
+    lcd_sync();
     skeleton_inited = 0;
 }
 
@@ -62,6 +63,7 @@ void MapNovo(void* arg){
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
     MapNovoL(arg);
+    lcd_sync();
     skeleton_inited = 0;
 }
 
@@ -87,7 +89,7 @@ void dispSchedItem(void* arg){
 
     memset(wrkstr,0,128);
     sprintf(wrkstr,"Loc: %s",currMenuItem->schedloc);
-    lcd_setStr(wrkstr,2,0,BLACK,B12_WHITE,0,1);
+    lcd_setStr(wrkstr,2,0,B12_BLACK,B12_WHITE,0,1);
 
     switch(currMenuItem->schedtype){
     case 'W':
@@ -114,17 +116,19 @@ void dispSchedItem(void* arg){
         printf("unknown type %c\n",currMenuItem->schedtype);
     }
 
-    lcd_setStr(wrkstr,32,0,BLACK,B12_WHITE,0,1);
+    lcd_setStr(wrkstr,32,0,B12_BLACK,B12_WHITE,0,1);
     lcd_setRect(30,0, 30,131, 1, 0);
     lcd_setRect(47,0, 94,131, 1, B12_RED);
     lcd_setStr(currMenuItem->menuText+12,48,0,B12_WHITE,B12_RED,0,1);
     lcd_setRect(46,0, 46,131, 1, 0);
     if(currMenuItem->schedspk != NULL)
-    lcd_setStr(currMenuItem->schedspk,96,0,BLACK,B12_WHITE,0,1);
+    lcd_setStr(currMenuItem->schedspk,96,0,B12_BLACK,B12_WHITE,0,1);
     lcd_setRect(94,0, 94,131, 1, 0);
     free(wrkstr);
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
+
+    lcd_sync();
 }
 
 
@@ -241,13 +245,13 @@ void manage_click_menu(uint32_t value,uint32_t level ){
 
 
         lcd_setRect((((oldrank%7)+1)*16)+1,0, (((oldrank%7)+2)*16)-1,131, 1, B12_WHITE);
-        lcd_setStr(oldmenuitem->menuText,(((oldrank%7)+1)*16)+2,0,BLACK,B12_WHITE,0,0);
+        lcd_setStr(oldmenuitem->menuText,(((oldrank%7)+1)*16)+2,0,B12_BLACK,B12_WHITE,0,0);
         lcd_setRect((((currselected%7)+1)*16)+1,0, (((currselected%7)+2)*16)-1,131, 1, B12_RED);
         lcd_setStr(currMenuItem->menuText,(((currselected%7)+1)*16)+2,0,B12_WHITE,B12_RED,0,0);
         lcd_setRect(((oldrank%7)+1)*16,0, ((oldrank%7)+1)*16,131, 1, 0);
         lcd_setRect(((currselected%7)+1)*16,0,((currselected%7)+1)*16,131, 1, 0);
         menu_dirty=0;
-
+        lcd_sync();
     }
 }
 void * menuAuthorisedFuncByName(char * funcname){
@@ -410,7 +414,7 @@ void display_skeleton()
         }
 
         used[i]=1;
-        lcd_setStr(dispmenuitem->menuText,((i+1)*16)+2,0,(i==(currselected%7))?B12_WHITE:BLACK,(i==(currselected%7))?B12_RED:B12_WHITE,0,0);
+        lcd_setStr(dispmenuitem->menuText,((i+1)*16)+2,0,(i==(currselected%7))?B12_WHITE:B12_BLACK,(i==(currselected%7))?B12_RED:B12_WHITE,0,0);
         i++;
         dispmenuitem=dispmenuitem->next;
     }
@@ -424,8 +428,7 @@ void display_skeleton()
     for(i=1;i<8;i++)
         lcd_setRect(i*16,0, i*16,131, 1, 0);
 
-
-
+    lcd_sync();
 }
 
 gpio_num_t pins_buttons[7] = { 

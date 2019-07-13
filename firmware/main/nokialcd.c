@@ -1,37 +1,26 @@
-#include "./nokialcd.h"
-#include "./brucon.h"
-#include "./test.h"
-#include "map.h"
-#include "westvleteren.h"
+#include "nokialcd.h"
+#include "img_brucon.h"
+#include "img_map.h"
+#include "img_westvleteren.h"
+#include "font_opensans_10.h"
 #include "brucon_adc.h"
 #include "brucon_nvs.h"
 
 #include <freertos/task.h>
 extern TickType_t  last_click;
 
-#define USE_BITBANG 0
-
 spi_device_handle_t spi;
 uint8_t driver;
 
-typedef struct {
-    uint8_t cmd;
-    uint8_t data[16];
-    uint8_t databytes; //No of data in data; bit 7 = delay after set; 0xFF = end of cmds.
-} lcd_init_cmd_t;
-
-
-DRAM_ATTR static const lcd_init_cmd_t Epson_init_cmds[]={
-};
-
-DRAM_ATTR static const lcd_init_cmd_t Phillips_init_cmds[]={
-};
-
-
-uint16_t * frame=NULL;// [ROW_LENGTH*COL_HEIGHT];
-
+uint16_t frame[ROW_LENGTH * COL_HEIGHT];
 
 void do_spi_init();
+
+
+
+
+static inline int min(int a, int b) { return (a < b ? a : b); }
+static inline int max(int a, int b) { return (a > b ? a : b); }
 
 
 #define CMD(x)  (x)
@@ -42,10 +31,11 @@ typedef struct {
     int pos;             /* current position in buffer[] */
     int total_bits;      /* total bits currently in the buffer */
     int max_bits;        /* maximum number of bits in the buffer */
-    uint32_t buffer[0];
+    uint32_t buffer[];
 } bit_buffer_t;
 
-static inline void bit_buffer_clear(bit_buffer_t *bb) {
+static inline void bit_buffer_clear(bit_buffer_t *bb)
+{
     bb->bit = 0;
     bb->pos = 0;
     bb->total_bits = 0;
@@ -53,22 +43,23 @@ static inline void bit_buffer_clear(bit_buffer_t *bb) {
                           * element will be cleared when the buffer is getting used */
 }
 
-static inline bit_buffer_t *bit_buffer_alloc(int bits) {
-    bit_buffer_t *bb = heap_caps_malloc(sizeof(bit_buffer_t) + (bits + 31) / 8, MALLOC_CAP_DMA);
+static inline bit_buffer_t *bit_buffer_alloc(int bits)
+{
+    bit_buffer_t *bb = heap_caps_malloc(sizeof(bit_buffer_t) + ((bits + 31) & ~31) / 8, MALLOC_CAP_DMA);
     if (bb)
         bit_buffer_clear(bb);
     return bb;
 }
 
-static inline void bit_buffer_add(bit_buffer_t *bb, int bits, uint32_t data) {
+static inline void bit_buffer_add(bit_buffer_t *bb, int bits, uint32_t data)
+{
     int available = 32 - bb->bit;  /* the available bits in buffer[pos] */
 
     if (bits == 0)
         return;
 
-    if (available >= bits) {       /* test if it fits in one step */
+    if (available >= bits)         /* test if it fits in one step */
         bb->buffer[bb->pos] |= __builtin_bswap32(data << (available - bits));
-    }
     else {                         /* crossing the 32-bit boundary */
         bb->buffer[bb->pos] |= __builtin_bswap32(data >> (bits - available));
         bb->buffer[bb->pos + 1] = __builtin_bswap32(data << (32 - (bits - available)));
@@ -83,7 +74,8 @@ static inline void bit_buffer_add(bit_buffer_t *bb, int bits, uint32_t data) {
         bb->buffer[bb->pos] = 0;   /* the next element is cleared */
 }
 
-void lcd_send_bit_buffer(spi_device_handle_t spi, bit_buffer_t *bb) {
+void lcd_send_bit_buffer(spi_device_handle_t spi, bit_buffer_t *bb)
+{
     esp_err_t ret;
     spi_transaction_t t = {
         .length = bb->total_bits,
@@ -95,12 +87,178 @@ void lcd_send_bit_buffer(spi_device_handle_t spi, bit_buffer_t *bb) {
 }
 
 
+#define get_nibble(x, n)     (((x) >> (n * 4)) & 0x0f)
+#define nibble(x, n)         (((x) & 0x0f) << (n * 4))
+#define set_nibble(a, x, n)  (((a) & ~(0x0f << (n * 4)) & 0xffff) | nibble((x), (n)))
+
+static pixel_t pixel_blend(pixel_t a, pixel_t b, unsigned int blend)
+{
+    unsigned int aa = get_nibble(a, 3);
+    unsigned int ab = (get_nibble(b, 3) * (blend + 1) >> 4);
+
+    b = set_nibble(b, ab, 3);
+
+    if (ab == 0xf)        /* b is covering a */
+        return b;
+    else if (ab == 0)     /* b is invisible */
+        return a;
+    else if (aa == 0)     /* a is invisble */
+        return b;
+    else if (aa == 0xf)   /* a is opaque */
+        return nibble(0xf, 3) |
+            nibble(((get_nibble(b, 2) * (ab + 1)) >> 4) + ((get_nibble(a, 2) * (16 - ab)) >> 4), 2) | /* R */
+            nibble(((get_nibble(b, 1) * (ab + 1)) >> 4) + ((get_nibble(a, 1) * (16 - ab)) >> 4), 1) | /* G */
+            nibble(((get_nibble(b, 0) * (ab + 1)) >> 4) + ((get_nibble(a, 0) * (16 - ab)) >> 4), 0);  /* B */
+                          /* both a & b have alpha */
+    return nibble(max(aa, ab), 3) |
+        nibble(((get_nibble(b, 2) * ab) / (aa + ab)) + ((get_nibble(a, 2) * aa) / (aa + ab)), 2) |    /* R */
+        nibble(((get_nibble(b, 1) * ab) / (aa + ab)) + ((get_nibble(a, 1) * aa) / (aa + ab)), 1) |    /* G */
+        nibble(((get_nibble(b, 0) * ab) / (aa + ab)) + ((get_nibble(a, 0) * aa) / (aa + ab)), 0);     /* B */
+}
+
+void draw_pixel(int x, int y, pixel_t color, unsigned int blend)
+{
+    if(x < 0 || y < 0 || x > ROW_LENGTH - 1 || y > COL_HEIGHT - 1)
+        return;
+
+    pixel_t * dst = frame + (y * COL_HEIGHT) + x;
+    *dst = pixel_blend(*dst, color, blend);
+}
+
+static inline font_char_t * get_font_char(const font_t *font, int ch)
+{
+    /* If a character is out of range, the first will be returned. Usually it's space (' '). */
+    ch = min(font->max, ch);
+    ch -= font->min;
+    ch = max(0, ch);
+    return (font_char_t *)(font->data + font->lookup[ch]);
+}
+
+int string_width(const font_t * font, const char * str)
+{
+    if (!str)
+        return 0;
+
+    int result = 0;
+    while (*str)
+        result += get_font_char(font, *str++)->advance;
+
+    return result;
+}
+
+void draw_string(const font_t * font, int x, int y, pixel_t color, const char * str)
+{
+    if (!str)
+        return;
+
+    while (*str) {
+        font_char_t * fc = get_font_char(font, *str++);
+        for (int cy = 0, cc = 0; cy < fc->h; cy++)
+            for (int cx = 0; cx < fc->w; cx++, cc++)
+                draw_pixel(x + cx + fc->left, y + cy - fc->top, color,
+                        (fc->buffer[cc / 4] >> ((cc % 4) * 4)) & 0x0f);
+
+        x += fc->advance;
+    }
+}
+
+void draw_string_aligned(const font_t * font, int x, int y, int w, int h,
+        pixel_t color, unsigned int flags, const char *str)
+{
+    char l[1024];
+    char * lines[16]; // Max 16 lines
+    int line = 1;
+
+    if (!str || (w <= 0) || (h <= 0))
+        return;
+
+    strcpy(l, str);
+    lines[0] = l;
+
+    if (flags & WRAP) {
+        char * last_space = NULL;
+        char * p = l;
+
+        while (*p) {
+            if (*p == '\n') {                 /* linebreak */
+                *p = '\0';
+                lines[line++] = ++p;
+                last_space = NULL;
+                continue;
+            }
+            else if (*p == ' ') {             /* space, check wrapping */
+                *p = '\0';
+                if (string_width(font, lines[line - 1]) > w) {  /* wrap ! */
+                    if (last_space == NULL)   /* no space on this line */
+                        p++;
+                    else {                    /* wrap at previous space */
+                        *p = ' ';
+                        *last_space = '\0';
+                        p = last_space + 1;
+                    }
+                    lines[line++] = p;
+                    last_space = NULL;
+                    continue;
+                }
+                last_space = p;
+                *p = ' ';
+            }
+            p++;
+        }
+        if (string_width(font, lines[line - 1]) > w) {
+            /* Final line too long -> wrap once more */
+            if (last_space != NULL) {         /* wrap at previous space */
+                *last_space = '\0';
+                lines[line++] = last_space + 1;
+            }
+        }
+    }
+
+    switch (flags & ALIGN_V) {
+        case TOP:      y += font->height;  break;
+        case VCENTER:  y += (font->height + h - (font->height * (line - 1))) / 2;  break;
+        case BOTTOM:   y += h - (font->height * (line - 1));  break;
+    }
+
+    for (int i = 0; i < line; i++) {
+        int px = x;
+        switch (flags & ALIGN_H) {
+            case CENTER:  px += (w - string_width(font, lines[i])) / 2;  break;
+            case RIGHT:   px += w - string_width(font, lines[i]);  break;
+        }
+        draw_string(font, px, y + i * font->height, color, lines[i]);
+    }
+}
+
+static bool intersect(int x1, int y1, int w1, int h1,
+                      int x2, int y2, int w2, int h2,
+                      int * xr, int * yr, int * wr, int * hr)
+{
+    int x3 = x1 + w1, y3 = y1 + h1, x4 = x2 + w2, y4 = y2 + h2;
+    *xr = max(x1, x2); *wr = min(x3 - *xr, x4 - *xr);
+    *yr = max(y1, y2); *hr = min(y3 - *yr, y4 - *yr);
+    if (*wr <= 0 || *hr <= 0) { /* no overlap */
+        *xr = 0; *yr = 0; *wr = 0; *hr = 0;
+        return false;
+    }
+    return true;
+}
+
+void draw_image(const image_t * img, int x, int y)
+{
+    int dx, dy, dw, dh;
+
+    if (intersect(0, 0, ROW_LENGTH, COL_HEIGHT, x, y, img->w, img->h, &dx, &dy, &dw, &dh)) {
+        const pixel_t * src = img->buffer + ((dy - y) * img->w) + (dx - x);
+        pixel_t * dst = frame + (dy * ROW_LENGTH) + dx;
+
+        for (; dh; dh--, src += img->w - dw, dst += ROW_LENGTH - dw)
+            for (int i = dw; i; i--, dst++, src++)
+                *dst = pixel_blend(*dst, *src, 0xf);
+    }
+}
+
 static bit_buffer_t *line_buffer;
-
-
-
-
-
 
 void switchbacklight(int state){
     if(state)
@@ -113,134 +271,18 @@ void switchbacklight(int state){
     gpio_set_level(ENSCR_PIN,state);
 }
 
-#if USE_BITBANG
-
-void lcd_send(unsigned char is_data,unsigned char data)
-{
-    char jj;
-    LCD_CS_L;
-    if(is_data)
-        LCD_DIO_H;
-    else
-        LCD_DIO_L;
-    clockit;
-    for (jj = 0; jj < 8; jj++)
-    {
-        if ((data & 0x80) == 0x80){
-
-            LCD_DIO_H;
-        } else {
-
-            LCD_DIO_L;
-        }
-
-        clockit;
-        data<<=1;
-    }
-    LCD_CS_H;
-}
-
-
-
-void init_lcd(int type)
-{
-    // frame = (uint16_t*) malloc(ROW_LENGTH*COL_HEIGHT*sizeof(uint16_t));
-    gpio_config_t io_conf;
-    driver = type;
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask =  (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) | (1ULL<<LCD_RST) |  (1ULL<<LCD_CS)|  (1ULL<<TRIGLA);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-    TRIG;
-
-    
-    LCD_SCK_L;
-    LCD_DIO_L;
-    dl_us(10);
-    LCD_CS_H;
-    dl_us(10);
-    LCD_RST_L;
-    dl_us(200);
-    LCD_SCK_H;
-    LCD_DIO_H;
-    LCD_RST_H;
-
-     do_spi_init();
-
-
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask =  (1ULL<<ENSCR_PIN);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-     
-
-}
-
-#else
-portMUX_TYPE mmux = portMUX_INITIALIZER_UNLOCKED;
-portMUX_TYPE * mux = &mmux;
-
-static inline void send_9(uint16_t data){
-    esp_err_t ret;
-    spi_transaction_t t = {
-        .flags = SPI_TRANS_USE_RXDATA | SPI_TRANS_USE_TXDATA,
-        .length = 9,                     //Command is 9 bits
-    };
-    *((uint32_t *)&t.tx_data) = SPI_SWAP_DATA_TX(data, 9);
-
-    ret = spi_device_transmit(spi, &t);
-    assert(ret == ESP_OK);
-}
-
-void lcd_send(char t,uint8_t d)
-{
-    uint16_t c = ((t<<8) | d);
-    send_9(c);
-}
-
-void lcd_cmd(uint8_t cmd)
-{
-    uint16_t c = (0x000 | cmd);
-    send_9(c);
-}
-
-void lcd_data(uint8_t data)
-{
-    uint16_t c = (0x100 | data);
-    send_9(c);
-}
-
-
-void lcd_spi_pre_transfer_callback(spi_transaction_t *t)
-{
-    gpio_set_level(LCD_CS, 0);
-}
-void lcd_spi_post_transfer_callback(spi_transaction_t *t)
-{
-    gpio_set_level(LCD_CS, 1);
-}
-
-
- 
-
 void init_lcd(int type)
 {
     esp_err_t ret;
     //int i;
-    vPortCPUInitializeMutex(mux);
     gpio_config_t io_conf;
     driver = type;
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask =  (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) | (1ULL<<LCD_RST) |  (1ULL<<LCD_CS)|  (1ULL<<TRIGLA);
+    io_conf.pin_bit_mask =  (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) | (1ULL<<LCD_RST) |  (1ULL<<LCD_CS);
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
-    TRIG;
 
     LCD_SCK_L;
     LCD_DIO_L;
@@ -275,7 +317,7 @@ void init_lcd(int type)
     gpio_config_t io_conf2={
         .intr_type = GPIO_PIN_INTR_DISABLE,
         .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) |  (1ULL<<LCD_RST) |  (1ULL<<LCD_CS)|  (1ULL<<TRIGLA),
+        .pin_bit_mask = (1ULL<<LCD_SCK) |  (1ULL<<LCD_DIO) |  (1ULL<<LCD_RST) |  (1ULL<<LCD_CS),
         .pull_down_en = 0,
         .pull_up_en = 0
     };
@@ -283,7 +325,7 @@ void init_lcd(int type)
 
     driver = type;
 
-
+    line_buffer = bit_buffer_alloc(((ROW_LENGTH + 1) / 2 * 3) * 9);
 
     ret=spi_bus_initialize(HSPI_HOST, &buscfg, 1);
     assert(ret==ESP_OK);
@@ -292,7 +334,7 @@ void init_lcd(int type)
     assert(ret==ESP_OK);
     do_spi_init();
 
-    
+
     io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
     io_conf.pin_bit_mask =  (1ULL<<ENSCR_PIN);
@@ -305,56 +347,40 @@ void init_lcd(int type)
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
-
-    line_buffer = bit_buffer_alloc(((ROW_LENGTH + 1) / 2 * 3) * 9);
 }
-
-
-
-#endif
-
 
 
 
 void do_spi_init()
 {
-    TRIG;
     LCD_CS_H;
     dl_us(10);
     LCD_RST_L;
     dl_us(200);
     LCD_RST_H;
 
-    if (driver == PHILLIPS){
-        lcd_send(LCD_COMMAND,SLEEPOUT);	// Sleep Out (0x11)
-        lcd_send(LCD_COMMAND,BSTRON);   	// Booster voltage on (0x03)
-        lcd_send(LCD_COMMAND,DISPON);		// Display on (0x29)
+    if (driver == PHILLIPS) {
+        bit_buffer_clear(line_buffer);
+        bit_buffer_add(line_buffer, 9, CMD(SLEEPOUT));  // Sleep Out (0x11)
+        bit_buffer_add(line_buffer, 9, CMD(BSTRON));    // Booster voltage on (0x03)
+        bit_buffer_add(line_buffer, 9, CMD(DISPON));    // Display on (0x29)
         // lcd_send(LCD_COMMAND,INVON);		// Inversion on (0x20)
         // 12-bit color pixel format:
-        lcd_send(LCD_COMMAND,PCOLMOD);		// Color interface format (0x3A)
-        lcd_send(LCD_DATA,0x03);			// 0b011 is 12-bit/pixel mode
-        lcd_send(LCD_COMMAND,MADCTL);		// Memory Access Control(PHILLIPS)
+        bit_buffer_add(line_buffer, 9, CMD(PCOLMOD));   // Color interface format (0x3A)
+        bit_buffer_add(line_buffer, 9, DATA(0x03));     // 0b011 is 12-bit/pixel mode
+        bit_buffer_add(line_buffer, 9, CMD(MADCTL));    // Memory Access Control(PHILLIPS)
 
-        lcd_send(LCD_DATA,0x00);
-        lcd_send(LCD_COMMAND,SETCON);		// Set Contrast(PHILLIPS)
-        lcd_send(LCD_DATA,0x3f);
+        bit_buffer_add(line_buffer, 9, DATA(0xC0));     // Mirror X & Y -> rotate display 180 deg
+        bit_buffer_add(line_buffer, 9, CMD(SETCON));    // Set Contrast(PHILLIPS)
+        bit_buffer_add(line_buffer, 9, DATA(0x3f));
 
-        lcd_send(LCD_COMMAND,NOPP); // nop(PHILLIPS)
+        bit_buffer_add(line_buffer, 9, CMD(NOPP));      // nop(PHILLIPS)
+
+        lcd_send_bit_buffer(spi, line_buffer);
     }
-
-
 }
 
-
-void fillframe12B(int color_12b)
-{
-    uint32_t i =0;
-    while(i<ROW_LENGTH*COL_HEIGHT)
-            frame[i++]=color_12b;
-}
-
-
-void go_framep(uint16_t *p)
+void lcd_sync()
 {
     bit_buffer_clear(line_buffer);
     bit_buffer_add(line_buffer, 9, CMD((driver == EPSON ? PASET : PASETP)));
@@ -366,40 +392,22 @@ void go_framep(uint16_t *p)
     bit_buffer_add(line_buffer, 9, CMD((driver == EPSON ? RAMWR : RAMWRP)));
     lcd_send_bit_buffer(spi, line_buffer);
 
-    for (unsigned int y = 0; y < COL_HEIGHT; y++) {
+    uint16_t * p = frame;
+    for (int y = 0; y < COL_HEIGHT; y++) {
         bit_buffer_clear(line_buffer);
-        for (unsigned int x = 0; x < ROW_LENGTH; x += 2, p += 2) {
-            bit_buffer_add(line_buffer, 9, 0x100 | (((*p) >> 4) & 0xff));
-            bit_buffer_add(line_buffer, 9, 0x100 | ((*p & 0x0F) << 4) | (*(p + 1) >> 8));
-            bit_buffer_add(line_buffer, 9, 0x100 | (*(p + 1) & 0xff));
+        for (int x = 0; x < ROW_LENGTH; x += 2, p += 2) {
+            bit_buffer_add(line_buffer, 9, DATA((((*p) >> 4) & 0xff)));
+            bit_buffer_add(line_buffer, 9, DATA(((*p & 0x0F) << 4) | ((*(p + 1) >> 8) & 0x0F)));
+            bit_buffer_add(line_buffer, 9, DATA((*(p + 1) & 0xff)));
         }
         lcd_send_bit_buffer(spi, line_buffer);
         bit_buffer_clear(line_buffer);
     }
 }
 
-void lcd_send_pixels(int p1, int p2)
-{
-    esp_err_t ret;
-    spi_transaction_t t = {
-        .flags = SPI_TRANS_USE_RXDATA | SPI_TRANS_USE_TXDATA,
-        .length = 27,
-    };
-    uint32_t data = 0;
-
-    data |= (0x100 | ((p1>>4)&0x00FF)) << 18;
-    data |= (0x100 | ((p1&0x0F)<<4)|(p2>>8)) << 9;
-    data |= (0x100 | (p2&0x0FF));
-
-    *((uint32_t *)&t.tx_data) = SPI_SWAP_DATA_TX(data, 27);
-
-    ret = spi_device_transmit(spi, &t);
-    assert(ret == ESP_OK);
-}
-
 void bruconlogo()
 {
-    go_framep(bruconbmp);
+    draw_image(&img_brucon, 0, 0);
 }
 
 #define RAND_NR_STR 13
@@ -418,14 +426,14 @@ char * radnstr[RAND_NR_STR] = {
     "heap spray",
     "0 day",
     "solder",
-    
+
 };
 
 
 
 uint32_t VivaLaVodkaL(void* arg){
     preventbacklighttimeoutTask = 1;
-    
+
     TaskHandle_t Tasktemp;
     int32_t score = getBruCONConfigUint32("AlcCal");
     gpio_config_t io_conf;
@@ -437,7 +445,7 @@ uint32_t VivaLaVodkaL(void* arg){
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
     gpio_set_level(PIN_HEATER_ALC,1);
-    lcd_clearB12(0);
+    lcd_clearB12(B12_BLACK);
     lcd_setStr("DrinkResponsibly",2,0,B12_WHITE,0,1,0);
     lcd_setStr("  This is a TOY",18,0,B12_WHITE,0,1,0);
     lcd_setStr(" DO NOT TRUST IT",34,0,B12_RED,0,1,0);
@@ -445,10 +453,13 @@ uint32_t VivaLaVodkaL(void* arg){
     char * p =radnstr[esp_random()%RAND_NR_STR];
     lcd_setStr(p,72,64-((strlen(p)/2)*8),B12_WHITE,0,1,0);
     TickType_t tickstart = xTaskGetTickCount();
+    lcd_sync();
     while((xTaskGetTickCount() -  tickstart) < 2000 ){
         lcd_setStr(" Sensor heating",95,0,B12_RED,0,1,0);
+        lcd_sync();
         vTaskDelay(400 / portTICK_PERIOD_MS);
         lcd_setRect(90,0,108 ,131, 1, 0);
+        lcd_sync();
         vTaskDelay(400 / portTICK_PERIOD_MS);
 
     }
@@ -457,8 +468,10 @@ uint32_t VivaLaVodkaL(void* arg){
     xTaskCreate( &  getAlcTask  , "getAlc" , 4096, NULL , 5| portPRIVILEGE_BIT , &Tasktemp );
     while((xTaskGetTickCount() -  tickstart) < 1500 ){
         lcd_setStr(" Blow on Sensor",90,0,B12_GREEN,0,1,0);
+        lcd_sync();
         vTaskDelay(400 / portTICK_PERIOD_MS);
         lcd_setRect(90,0,108 ,131, 1, 0);
+        lcd_sync();
         vTaskDelay(400 / portTICK_PERIOD_MS);
 
     }
@@ -474,6 +487,7 @@ uint32_t VivaLaVodkaL(void* arg){
     lcd_setRect(90,0,108 ,131, 1, 0);
     sprintf(tmp_str,"C2H6O lvl:%d",score);
     lcd_setStr(tmp_str,95,0,B12_WHITE,0,1,0);
+    lcd_sync();
     printf("ALC SCORE:%d\n",score);
     preventbacklighttimeoutTask = 0;
     last_click = xTaskGetTickCount();
@@ -481,258 +495,64 @@ uint32_t VivaLaVodkaL(void* arg){
     return score;
 }
 
-void MapWestL(void* arg){
-    go_framep(westvleterenbmp);
-
-};
-
-void MapNovoL(void* arg){
-    go_framep(mapbmp);
-};
-
-
-
-void lcd_clearB12(int color){
-    bit_buffer_clear(line_buffer);
-    bit_buffer_add(line_buffer, 9, CMD((driver == EPSON ? PASET : PASETP)));
-    bit_buffer_add(line_buffer, 9, DATA(0));
-    bit_buffer_add(line_buffer, 9, DATA(131));
-    bit_buffer_add(line_buffer, 9, CMD((driver == EPSON ? CASET : CASETP)));
-    bit_buffer_add(line_buffer, 9, DATA(0));
-    bit_buffer_add(line_buffer, 9, DATA(131));
-    bit_buffer_add(line_buffer, 9, CMD((driver == EPSON ? RAMWR : RAMWRP)));
-    lcd_send_bit_buffer(spi, line_buffer);
-
-    /* Prepare one row */
-    bit_buffer_clear(line_buffer);
-    for (unsigned int x = 0; x < ROW_LENGTH; x += 2) {
-        bit_buffer_add(line_buffer, 9, 0x100 | (((color) >> 4) & 0xff));
-        bit_buffer_add(line_buffer, 9, 0x100 | ((color & 0x0F) << 4) | (color >> 8));
-        bit_buffer_add(line_buffer, 9, 0x100 | (color & 0xff));
-    }
-
-    /* Send the same row until the screen is filled */
-    for (unsigned int y = 0; y < COL_HEIGHT; y++)
-        lcd_send_bit_buffer(spi, line_buffer);
+void MapWestL(void* arg)
+{
+    draw_image(&img_westvleteren, 0, 0);
 }
 
-void lcd_contrast(char setting){
-    	if (driver == EPSON)
+void MapNovoL(void* arg)
+{
+    draw_image(&img_map, 0, 0);
+}
+
+void lcd_clearB12(uint16_t color)
+{
+    for (uint16_t * p = frame; p < frame + (ROW_LENGTH * COL_HEIGHT); p++)
+        *p = color;
+}
+
+void lcd_contrast(char setting) {
+    bit_buffer_clear(line_buffer);
+    if (driver == EPSON)
 	{
 		setting &= 0x3F;	// 2 msb's not used, mask out
-        lcd_send(LCD_COMMAND,VOLCTR);	// electronic volume, this is the contrast/brightness(EPSON)
-		lcd_send(LCD_DATA,setting);	// volume (contrast) setting - course adjustment,  -- original was 24
-		lcd_send(LCD_DATA,3);			// TODO: Make this coarse adjustment variable, 3's a good place to stay
+        bit_buffer_add(line_buffer, 9, CMD(VOLCTR));    // electronic volume, this is the contrast/brightness(EPSON)
+		bit_buffer_add(line_buffer, 9, DATA(setting));  // volume (contrast) setting - course adjustment,  -- original was 24
+		bit_buffer_add(line_buffer, 9, DATA(3));        // TODO: Make this coarse adjustment variable, 3's a good place to stay
 	}
 	else if (driver == PHILLIPS)
 	{
 		setting &= 0x7F;	// msb is not used, mask it out
-        lcd_send(LCD_COMMAND,SETCON);	// contrast command (PHILLIPS)
-		lcd_send(LCD_DATA,setting);	// volume (contrast) setting - course adjustment,  -- original was 24
+        bit_buffer_add(line_buffer, 9, CMD(SETCON));    // contrast command (PHILLIPS)
+		bit_buffer_add(line_buffer, 9, DATA(setting));  // volume (contrast) setting - course adjustment,  -- original was 24
 	}
-
+    lcd_send_bit_buffer(spi, line_buffer);
 };
+
 void lcd_setArc(int x0, int y0, int radius, int arcSegments[], int numSegments, int lineThickness, int color){};
 void lcd_setCircle (int x0, int y0, int radius, int color, int lineThickness){};
 
-void lcd_setChar(char c, int x, int y, int fColor, int bColor, char transp)
-{
-	y	=	(COL_HEIGHT - 1) - y; // make display "right" side up
-	x	=	(ROW_LENGTH - 2) - x;
-
-	int             i,j;
-	unsigned int    nCols;
-	unsigned int    nRows;
-	unsigned int    nBytes;
-	unsigned char   PixelRow;
-	unsigned char   Mask;
-	unsigned int    Word0;
-	unsigned int    Word1;
-	const unsigned char   *pFont;
-	const unsigned char   *pChar;
-
-
-	// get pointer to the beginning of the selected font table
-	pFont = (const unsigned char *)FONT8x16;
-	// get the nColumns, nRows and nBytes
-	nCols = *(pFont);
-	nRows = *(pFont + 1);
-	nBytes = *(pFont + 2);
-	// get pointer to the last byte of the desired character
-	pChar = pFont + (nBytes * (c - 0x1F)) + nBytes - 1;
-
-	if (driver)	// if it's an epson
-	{
-		// Row address set (command 0x2B)
-		lcd_send(LCD_COMMAND,PASET);
-		lcd_send(LCD_DATA,x);
-		lcd_send(LCD_DATA,x + nRows - 1);
-		// Column address set (command 0x2A)
-		lcd_send(LCD_COMMAND,CASET);
-		lcd_send(LCD_DATA,y);
-		lcd_send(LCD_DATA,y + nCols - 1);
-
-		// WRITE MEMORY
-		lcd_send(LCD_COMMAND,RAMWR);
-		// loop on each row, working backwards from the bottom to the top
-		for (i = nRows - 1; i >= 0; i--) {
-			// copy pixel row from font table and then decrement row
-			PixelRow = *(pChar++);
-			// loop on each pixel in the row (left to right)
-			// Note: we do two pixels each loop
-			Mask = 0x80;
-			for (j = 0; j < nCols; j += 2)
-			{
-				// if pixel bit set, use foreground color; else use the background color
-				// now get the pixel color for two successive pixels
-				if ((PixelRow & Mask) == 0)
-					Word0 = frame[i*ROW_LENGTH+j];
-				else
-					Word0 = fColor;
-				Mask = Mask >> 1;
-				if ((PixelRow & Mask) == 0)
-					Word1 = bColor;
-				else
-					Word1 = fColor;
-				Mask = Mask >> 1;
-				// use this information to output three data bytes
-				lcd_send_pixels(Word0, Word1);
-			}
-		}
-	}
-	else
-	{
-        // fColor = swapColors(fColor);
-        // bColor = swapColors(bColor);
-
-		// Row address set (command 0x2B)
-		lcd_send(LCD_COMMAND,PASETP);
-		lcd_send(LCD_DATA,x);
-		lcd_send(LCD_DATA,x + nRows - 1);
-		// Column address set (command 0x2A)
-		lcd_send(LCD_COMMAND,CASETP);
-		lcd_send(LCD_DATA,y);
-		lcd_send(LCD_DATA,y + nCols - 1);
-
-		// WRITE MEMORY
-		lcd_send(LCD_COMMAND,RAMWRP);
-		// loop on each row, working backwards from the bottom to the top
-		pChar+=nBytes-1;  // stick pChar at the end of the row - gonna reverse print on phillips
-		for (i = nRows - 1; i >= 0; i--) {
-			// copy pixel row from font table and then decrement row
-			PixelRow = *(pChar--);
-			// loop on each pixel in the row (left to right)
-			// Note: we do two pixels each loop
-			Mask = 0x01;  // <- opposite of epson
-			for (j = 0; j < nCols; j += 2)
-			{
-				// if pixel bit set, use foreground color; else use the background color
-				// now get the pixel color for two successive pixels
-				if ((PixelRow & Mask) == 0)
-					Word0 = bColor;//frame[i*ROW_LENGTH+j];
-				else
-					Word0 = fColor;
-				Mask = Mask << 1; // <- opposite of epson
-				if ((PixelRow & Mask) == 0)
-					Word1 = bColor;//frame[i*ROW_LENGTH+j];
-				else
-					Word1 = fColor;
-				Mask = Mask << 1; // <- opposite of epson
-				// use this information to output three data bytes
-				lcd_send_pixels(Word0, Word1);
-			}
-		}
-	}
-}
-
-
 void lcd_setStr(char *pString, int x, int y, int fColor, int bColor, char uselastfill, char newline)
 {
-	x = x + 12;
-	y = y + 7;
-    int originalY = y;
+    const font_t *f = &font_opensans_10;
 
-	// loop until null-terminator is seen
-	while (*pString != 0x00) {
-		// draw the character
-		lcd_setChar(*pString++, x, y, fColor, bColor,uselastfill);
-		// advance the y position
-		y = y + 8;
-		// bail out if y exceeds 131
-
-		if ((y > 131) ) {
-            if(newline){
-
-            x = x + 16;
-            y = originalY;
-            } else {
-                break;
-
-            }
-
-        }
-        if (x > 131) break;
-	}
+    if (!newline)
+        draw_string(f, y, x + f->height, fColor, pString);
+    else
+        draw_string_aligned(f, y + 2, x, ROW_LENGTH - y - 4, COL_HEIGHT - x, fColor, WRAP | CENTER | TOP, pString);
 }
 
-void setPixel(int color, unsigned char x, unsigned char y)
+static void setPixel(int color, unsigned char x, unsigned char y)
 {
-        y       =       (COL_HEIGHT - 1) - y;
-        x = (ROW_LENGTH - 1) - x;
-
-        if (driver == EPSON) // if it's an epson
-        {
-                lcd_send(LCD_COMMAND,PASET);  // page start/end ram
-                lcd_send(LCD_DATA,x);
-                lcd_send(LCD_DATA,ENDPAGE);
-
-                lcd_send(LCD_COMMAND,CASET);  // column start/end ram
-                lcd_send(LCD_DATA,y);
-                lcd_send(LCD_DATA,ENDCOL);
-
-                lcd_send(LCD_COMMAND,RAMWR);  // write
-                lcd_send(LCD_DATA,(color>>4)&0x00FF);
-                lcd_send(LCD_DATA,((color&0x0F)<<4)|(color>>8));
-                lcd_send(LCD_DATA,color&0x0FF);
-        }
-        else if (driver == PHILLIPS)  // otherwise it's a phillips
-        {
-                lcd_send(LCD_COMMAND,PASETP); // page start/end ram
-                lcd_send(LCD_DATA,x);
-                lcd_send(LCD_DATA,x);
-
-                lcd_send(LCD_COMMAND,CASETP); // column start/end ram
-                lcd_send(LCD_DATA,y);
-                lcd_send(LCD_DATA,y);
-
-                lcd_send(LCD_COMMAND,RAMWRP); // write
-
-                lcd_send(LCD_DATA,(unsigned char)((color>>4)&0x00FF));
-                lcd_send(LCD_DATA,(unsigned char)(((color&0x0F)<<4)|0x00));
-        }
+        frame[y * ROW_LENGTH + x] = color;
 }
 
 void lcd_setLine(int x0, int y0, int x1, int y1, int color)
 {
-        int dy = y1 - y0; // Difference between y0 and y1
-        int dx = x1 - x0; // Difference between x0 and x1
-        int stepx, stepy;
-
-        if (dy < 0)
-        {
-                dy = -dy;
-                stepy = -1;
-        }
-        else
-                stepy = 1;
-
-        if (dx < 0)
-        {
-                dx = -dx;
-                stepx = -1;
-        }
-        else
-                stepx = 1;
+        int dy = abs(y1 - y0); // Difference between y0 and y1
+        int dx = abs(x1 - x0); // Difference between x0 and x1
+        int stepy = (y1 < y0 ? -1 : 1);
+        int stepx = (x1 < x0 ? -1 : 1);
 
         dy <<= 1; // dy is now 2*dy
         dx <<= 1; // dx is now 2*dx
@@ -773,107 +593,31 @@ void lcd_setLine(int x0, int y0, int x1, int y1, int color)
 void lcd_setRect(int x0, int y0, int x1, int y1, unsigned char fill, int color)
 {
     // check if the rectangle is to be filled
-    unsigned int xstart,xend,ystart,yend,width=0,height=0;
-    int j=0,i=0;
-    // int tx0,tx1,ty0,ty1;
+    unsigned int xstart,xend,ystart,yend;
 
-//    uint8_t cb0,cb1,cb2;
+    if (fill == 1) {
+        xstart = min(x0, x1);
+        xend   = max(x0, x1);
+        ystart = min(y0, y1);
+        yend   = max(y0, y1);
 
-    if (fill == 1)
-    {
-
-        y0 = (COL_HEIGHT - 1) - y0;
-        x0 = (ROW_LENGTH - 1) - x0;
-        y1 = (COL_HEIGHT - 1) - y1;
-        x1 = (ROW_LENGTH - 1) - x1;
-
-        if(x0>x1){
-            xstart=x1;
-            xend=x0;
-        } else {
-            xstart=x0;
-            xend=x1;
-        }
-        if(y0>y1){
-            ystart=y1;
-            yend=y0;
-        } else {
-            ystart=y0;
-            yend=y1;
-        }
-
-        width  = xend - xstart;
-        height = yend - ystart;
-
-
-        if (driver == EPSON) // if it's an epson
-        {
-            i=0;
-
-            lcd_send(LCD_COMMAND,PASET);  // page start/end ram
-            lcd_send(LCD_DATA,xstart);
-            lcd_send(LCD_DATA,xend);
-
-
-            lcd_send(LCD_COMMAND,CASET);  // column start/end ram
-            lcd_send(LCD_DATA,ystart);
-            lcd_send(LCD_DATA,yend);
-            j++;
-
-            lcd_send(LCD_COMMAND,RAMWR);  // write
-
-            while( i < (width*height)/2 ){
-                lcd_send_pixels(color, color);
-                i++;
-
-            }
-            if((width*height) & 1){
-                lcd_send(LCD_DATA,((color>>4)&0x00FF));
-                lcd_send(LCD_DATA,(((color&0x0F)<<4)|0x00));
-            }
-        }
-        else if (driver == PHILLIPS)  // otherwise it's a phillips
-        {
-            i=0;
-            lcd_send(LCD_COMMAND,PASETP); // page start/end ram
-            lcd_send(LCD_DATA,xstart);
-            lcd_send(LCD_DATA,xend);
-            ;
-
-            lcd_send(LCD_COMMAND,CASETP); // column start/end ram
-            lcd_send(LCD_DATA,ystart);
-            lcd_send(LCD_DATA,yend);
-            j++;
-
-
-            lcd_send(LCD_COMMAND,RAMWRP); // write
-
-            while( i < (((width*height)/2)+ (height>width?height:width))  ){
-                lcd_send_pixels(color, color);
-                i++;
-
-            }
-            if((width*height) & 1){
-                lcd_send(LCD_DATA,((color>>4)&0x00FF));
-                lcd_send(LCD_DATA,(((color&0x0F)<<4)|0x00));
-            }
-        }
+        /* TODO: x & y swapped ??? */
+        for (int y = xstart; y <= xend; y++)
+            for (int x = ystart; x <= yend; x++)
+                frame[y * ROW_LENGTH + x] = color;
     }
-
-
-    else
-    {
+    else {
         // best way to draw an unfilled rectangle is to draw four lines
         lcd_setLine(x0, y0, x1, y0, color);
         lcd_setLine(x0, y1, x1, y1, color);
         lcd_setLine(x0, y0, x0, y1, color);
         lcd_setLine(x1, y0, x1, y1, color);
     }
-
 }
-
 
 void lcd_printLogo(void){};
 void lcd_printBMP(char * image_main){}; //prints an image (BMP);
 void lcd_off(void){};
 void lcd_on(void){};
+
+// vim: expandtab:ts=4:sw=4
