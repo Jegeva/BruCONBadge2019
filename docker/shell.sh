@@ -6,7 +6,15 @@ else
     DEV=$1
 fi
 
-LOC_PATH=$(readlink -f $0|sed -r 's/[^/]+\/[^/]+$//')
+READLINK=readlink
+SED=sed
+
+[ $(uname) = "Darwin" ] && {
+    READLINK=greadlink
+    SED=gsed
+}
+
+LOC_PATH=$($READLINK -f $0 | $SED -r 's/[^/]+\/[^/]+$//')
 echo
 echo "Mapped Path  : $LOC_PATH"
 echo "Mapped Device: $DEV"
