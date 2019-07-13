@@ -3,7 +3,7 @@ LABEL Maintainer="JGV"
 
 
 RUN apt-get update
-RUN apt-get install -y apt-utils gcc git wget make libncurses-dev flex bison gperf python python-pip python-setuptools python-serial python-cryptography python-future python-pyparsing python-pyelftools curl libtool autoconf texinfo libusb-dev libftdi1-dev libhidapi-dev pkg-config unzip minicom nano
+RUN apt-get install -y apt-utils gcc git wget make libncurses-dev flex bison gperf python python-pip python-setuptools python-serial python-cryptography python-future python-pyparsing python-pyelftools curl libtool autoconf texinfo libusb-dev libftdi1-dev libhidapi-dev pkg-config unzip minicom nano libfreetype6-dev
 
 # openocd esp32
 
