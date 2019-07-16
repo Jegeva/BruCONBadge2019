@@ -75,7 +75,6 @@ void calAlcTask(){
 
 
 void getAlcTask(){
-  uint16_t ret=0;
   if(!adcs_setup)
     setup_adcs();
   getAlcSens=1;

@@ -28,7 +28,6 @@ void fixparent(menuItp p, menuItp h)
 char skeleton_inited = 0;
 
 void sched03(void* arg){
-    menuItp mitp;
     currMenuItem->child = schedhead_d1;
     fixparent(currMenuItem,currMenuItem->child);
     currMenuItem->funcp = NULL;
@@ -74,7 +73,7 @@ void VivaLaVodka(void * arg)
   fakeplaceholder.parent = currMenuItem;
   currMenuItem = &fakeplaceholder;
   uint32_t score = VivaLaVodkaL(arg);
-  xTaskCreate( &  send_alc_reading  , "SendAlc" , 4096, &score , 5| portPRIVILEGE_BIT , &Tasktemp);
+  xTaskCreate( send_alc_reading  , "SendAlc" , 4096, &score , 5| portPRIVILEGE_BIT , &Tasktemp);
   skeleton_inited = 0;
   while(ispostingAlc){
     vTaskDelay(200);
@@ -85,7 +84,6 @@ void VivaLaVodka(void * arg)
 void dispSchedItem(void* arg){
     lcd_clearB12(B12_WHITE);
     char * wrkstr = calloc(128,sizeof(char));
-    char * tmp;
 
     memset(wrkstr,0,128);
     sprintf(wrkstr,"Loc: %s",currMenuItem->schedloc);
@@ -110,7 +108,6 @@ void dispSchedItem(void* arg){
 
     case 'S':
         sprintf(wrkstr,"Type: Sp3ci4l");
-    tmp = "";
     break;
     default:
         printf("unknown type %c\n",currMenuItem->schedtype);
@@ -358,7 +355,7 @@ void parserSchedTree(const cJSON* tree){
   parserSchedTreeT(schedhead_d3,tree->child->next->next,0);
 
 }
-cJSON * parserMenuJson(char* jsonstring,uint8_t issched){
+cJSON * parserMenuJson(const char* jsonstring,uint8_t issched){
     cJSON *menu_json = cJSON_Parse(jsonstring);
     int depth = 0;
     if (menu_json == NULL)
@@ -527,8 +524,8 @@ void print_menu(menuItp aitem, int depth){
 }
 
 char    menu_inited=0;
-extern const uint8_t menu_json_start[] asm("_binary_menu_json_start");
-extern const uint8_t sched_json_start[] asm("_binary_schedule_sched_filtered_json_start");
+extern const char menu_json_start[] asm("_binary_menu_json_start");
+extern const char sched_json_start[] asm("_binary_schedule_sched_filtered_json_start");
 
 char * netsched = NULL;
 

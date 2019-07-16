@@ -29,15 +29,16 @@
 extern const uint8_t server_root_cert_pem_start[] asm("_binary_server_root_cert_pem_start");
 extern const uint8_t server_root_cert_pem_end[]   asm("_binary_server_root_cert_pem_end");
 
+void get_sched_task(void *);
 char * get_sched();
 
 extern volatile char isgeneratingRSA;
 extern volatile char isgettingClientCert;
 extern volatile char ispostingAlc;
-void task_genrsa(char * ret);
-void task_getclientcert(char * ret);
+void task_genrsa(void *);
+void task_getclientcert(void *);
 void restore_clicert( 	mbedtls_x509_crt ** cert,mbedtls_pk_context ** pk_ctx_dcert  );
-void send_alc_reading(int32_t * alc);
+void send_alc_reading(void * alc);
 extern volatile char isgettingsched;
 extern char * netsched;
 extern mbedtls_x509_crt * clicert;
