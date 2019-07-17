@@ -265,8 +265,7 @@ char * client_cert=NULL;
 char * postfile(char * action, char * fieldname,char* filename,char * filecontent)
 {
     char * boundary = "BruCONBoundary";
-    int i=0;
-    int lenc,lenh,len,ret;
+    int lenc,lenh,len;
 
     char * c_buff, * h_buff;
 
@@ -291,9 +290,9 @@ char * postfile(char * action, char * fieldname,char* filename,char * fileconten
     /* printf("%s",h_buff);
        printf("%s\n",c_buff); */
     initurl();
-    ret = mbedtls_ssl_write( ssl, (unsigned char*)h_buff, lenh);
-    ret = mbedtls_ssl_write( ssl, (unsigned char*)c_buff, lenc);
-    ret = read_http_response(&client_cert,&len,0);
+    (void) mbedtls_ssl_write( ssl, (unsigned char*)h_buff, lenh);
+    (void) mbedtls_ssl_write( ssl, (unsigned char*)c_buff, lenc);
+    (void) read_http_response((char **)&client_cert,&len,0);
     mbedtls_ssl_close_notify( ssl );
     disconnect_ssl();
 
@@ -306,7 +305,8 @@ char * postfile(char * action, char * fieldname,char* filename,char * fileconten
 }
 
 volatile char ispostingAlc;
-void send_alc_reading(int32_t * alc){
+void send_alc_reading(void * valc){
+  uint32_t *alc = (uint32_t *)valc;
   unsigned char buf[512];int ret;
   printf("sending score: %d\n",*alc);
   ispostingAlc=1;
@@ -324,13 +324,18 @@ void send_alc_reading(int32_t * alc){
   if(ret < 0){
     printf("ss error -%04x = %d , %s\n",-ret,len,buf);
   }
-  ret = read_http_response(&buf,&len,1);
+  ret = read_http_response((char **)&buf,&len,1);
   printf("%d %s",len,buf);
   disconnect_ssl();
   ispostingAlc=0;
   
   while(1){ vTaskDelay(10000);
   }
+}
+
+void get_sched_task(void * arg)
+{
+	(void) get_sched();
 }
 
 volatile char isgettingsched;
@@ -524,7 +529,7 @@ void save_csr(char * buff)
 }
 
 
-void task_genrsa(char * ret)
+void task_genrsa(void * arg)
 {
     uint16_t buffsize = 4096;
     mbedtls_pk_context * pubkey;
@@ -561,7 +566,7 @@ void task_genrsa(char * ret)
 }
 
 volatile char isgettingClientCert;
-void task_getclientcert(char * ret)
+void task_getclientcert(void * arg)
 {
     char * csr;
     getBruCONConfigString("csr",&csr);

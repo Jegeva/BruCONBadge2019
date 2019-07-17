@@ -33,7 +33,7 @@ uint8_t clicked_gui_value = 0;
 
 uint8_t mac[6] ;
 volatile char* macstr;
-volatile char* hostname;
+char* hostname;
 
 uint8_t click_value,click_level;
 
@@ -107,7 +107,6 @@ void gui()
   char * tut = calloc(50,1);
     rtc_wdt_disable();
  TaskHandle_t Tasktemp;;
- char havesched = 0;
  char get_sched_attempt =0;
  char get_sched_max_attempt =3;
  TickType_t tickstart = xTaskGetTickCount();
@@ -165,7 +164,7 @@ void gui()
                 printf("getting client cert\n");
 
                 isgettingClientCert = 1;
-                xTaskCreatePinnedToCore( &  task_getclientcert , "getClientCert" , 8192, NULL , 5| portPRIVILEGE_BIT , &Tasktemp ,0);
+                xTaskCreatePinnedToCore( task_getclientcert , "getClientCert" , 8192, NULL , 5| portPRIVILEGE_BIT , &Tasktemp ,0);
             } else {
                 vTaskDelete(Tasktemp);
 		restore_clicert(&clicert,&pk_ctx_clicert);
@@ -203,7 +202,7 @@ void gui()
                 printf("get sched:%d/%d\n",++get_sched_attempt,get_sched_max_attempt);
                 vTaskDelay(100 / portTICK_PERIOD_MS);
                 isgettingsched=1;
-                xTaskCreatePinnedToCore( &  get_sched , "getSched" , 8192, NULL , 5| portPRIVILEGE_BIT , &Tasktemp ,0);
+                xTaskCreatePinnedToCore( get_sched_task , "getSched" , 8192, NULL , 5| portPRIVILEGE_BIT , &Tasktemp ,0);
             }
         } else {
             main_state=GSTATE_MAIN_MENU;
@@ -275,7 +274,7 @@ void app_main()
   if(getBruCONConfigFlag("haveKeys") == 0){
   
     isgeneratingRSA=1;
-    xTaskCreatePinnedToCore( &  task_genrsa      , "genRSA" , 16384, &taskret , 5| portPRIVILEGE_BIT , &Tasktemp ,0);
+    xTaskCreatePinnedToCore( task_genrsa      , "genRSA" , 16384, &taskret , 5| portPRIVILEGE_BIT , &Tasktemp ,0);
 
     while(isgeneratingRSA){
       vTaskDelay(10);

@@ -17,7 +17,7 @@
 
 extern uint8_t mac[6] ;
 extern volatile char * macstr;
-extern volatile char * hostname;
+extern char * hostname;
 extern TickType_t last_click;
 
 
