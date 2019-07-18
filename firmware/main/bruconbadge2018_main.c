@@ -19,7 +19,6 @@
 #include "esp_log.h"
 
 #include "brucon_nvs.h"
-#include "brucon_adc.h"
 
 #define COL_RED "\033[1;31m"
 #define COL_STOP "\033[0m"
@@ -240,7 +239,6 @@ void app_main()
   /* Print chip information */
   esp_chip_info_t chip_info;
   TaskHandle_t Tasktemp;
-  TaskHandle_t Tasktemp2;
   rtc_wdt_disable();
   esp_efuse_mac_get_default(mac);
   esp_chip_info(&chip_info);
@@ -278,27 +276,10 @@ void app_main()
 
     while(isgeneratingRSA){
       vTaskDelay(10);
-      
-      //	printf("CAL : %d %d\n",calAlcSens,isgeneratingRSA);
     }
-    //  printf("CAL %d\n",calAlcSens);
     vTaskDelete(Tasktemp);
   }
   
-  if(getBruCONConfigFlag("haveAlcCal") == 0){
-    calAlcSens=1;
-    xTaskCreate(&calAlcTask,"CAL Alc", 4096,NULL, 3| portPRIVILEGE_BIT , &Tasktemp2);
-    while(calAlcSens){
-
-       printf("CALIBRATING ALC\n");
-      //printf("CAL : %d\n",calAlcSens);
-      vTaskDelay(1000);
-    }
-    
-    vTaskDelete(Tasktemp2);
-  }
-  
-
   // printf(COL_RED"have csr ? %d\n"COL_STOP, getBruCONConfigFlag("haveCSR"));
   //printf(COL_RED"have client cert ? %d\n"COL_STOP, getBruCONConfigFlag("haveClientCert"));
   if(getBruCONConfigFlag("haveClientCert")){
@@ -306,19 +287,6 @@ void app_main()
   }
   
   // esp_log_level_set("*",ESP_LOG_VERBOSE);
-
-
-  /* while(1){
-    calAlcSens=1;
-    xTaskCreate(&calAlcTask,"CAL Alc", 4096,NULL, 3| portPRIVILEGE_BIT , &Tasktemp2);
-    while(calAlcSens){
-      // printf("CALIBRATING ALC\n");
-      //printf("CAL : %d\n",calAlcSens);
-      vTaskDelay(10);
-    }
-    vTaskDelete(Tasktemp2);
-
-    }*/
 
   xTaskCreatePinnedToCore(&gui        , "guiTask" , 8192, NULL, 5| portPRIVILEGE_BIT , NULL,1);
   xTaskCreate(&wificonnect, "wifiTask", 8192, NULL, 0| portPRIVILEGE_BIT, NULL);

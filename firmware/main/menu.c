@@ -66,21 +66,6 @@ void MapNovo(void* arg){
     skeleton_inited = 0;
 }
 
-void VivaLaVodka(void * arg)
-{
-  // for you richard...
-  TaskHandle_t Tasktemp;
-  fakeplaceholder.parent = currMenuItem;
-  currMenuItem = &fakeplaceholder;
-  uint32_t score = VivaLaVodkaL(arg);
-  xTaskCreate( send_alc_reading  , "SendAlc" , 4096, &score , 5| portPRIVILEGE_BIT , &Tasktemp);
-  skeleton_inited = 0;
-  while(ispostingAlc){
-    vTaskDelay(200);
-  };
-}
-
-
 void dispSchedItem(void* arg){
     lcd_clearB12(B12_WHITE);
     char * wrkstr = calloc(128,sizeof(char));
@@ -129,7 +114,7 @@ void dispSchedItem(void* arg){
 }
 
 
-#define AUTHORIZED_FUNC_NBR 6
+#define AUTHORIZED_FUNC_NBR 5
 
 void * menuAuthorisedFunc[AUTHORIZED_FUNC_NBR] = {
     sched03,
@@ -137,7 +122,6 @@ void * menuAuthorisedFunc[AUTHORIZED_FUNC_NBR] = {
     sched05,
     MapWest,
     MapNovo,
-    VivaLaVodka
 };
 
 char * menuAuthorisedFuncName[AUTHORIZED_FUNC_NBR] = {
@@ -146,7 +130,6 @@ char * menuAuthorisedFuncName[AUTHORIZED_FUNC_NBR] = {
     "sched05",
     "MapWest",
     "MapNovo",
-    "VivaLaVodka"
 };
 
 
