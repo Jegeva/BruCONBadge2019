@@ -82,26 +82,12 @@ config NCHARGIN_GPIO_PIN
 	help
 		GPIO number (IOxx) for the not chargin net.
 
-config ALCSENSE_HEATER_PIN
-    int "Pin for the alcool sensor heater pin"
-	range 0 34
-	default 4
-	help
-		Pin for the alcool sensor heater pin
-
-config ALCSENSE_ADC_PIN
-    int "Pin for the alcool sensor ADC pin"
-	range 0 35
-	default 35
-	help
-		Pin for the alcool sensor ADC pin
-
 config BAT_ADC_PIN
     int "Pin for the battery load ADC pin"
 	range 0 35
 	default 32
 	help
-		Pin for the alcool sensor ADC pin
+		Pin for the battery load ADC pin
 
 
 #define PIN_BU 35

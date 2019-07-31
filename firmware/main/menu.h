@@ -37,7 +37,6 @@ extern char * netshed;
 
 
 
-void measureAlc(void *);
 menuItem * changemenuItem(menuItem *);
 void set_status_bar_text(char * b);
 void defaultmenu();

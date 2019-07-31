@@ -11,21 +11,13 @@
 #include "settings.h"
 
 #define PIN_ADC_BAT    CONFIG_BAT_ADC_PIN
-#define PIN_ADC_ALC    CONFIG_ALCSENSE_ADC_PIN
-#define PIN_HEATER_ALC CONFIG_ALCSENSE_HEATER_PIN
-
 
 #define ADC_NO_OF_SAMPLES 60
 
 extern volatile char getBat;
 extern volatile uint16_t Bat_level;
 extern volatile char CalBat;
-extern volatile char getAlcSens;
-extern volatile uint16_t Alc_level;
-extern volatile char calAlcSens;
 
-void calAlcTask();
-void getAlcTask();
 void calBatTask();
 void getBatTask();
 

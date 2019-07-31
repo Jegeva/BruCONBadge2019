@@ -34,11 +34,9 @@ char * get_sched();
 
 extern volatile char isgeneratingRSA;
 extern volatile char isgettingClientCert;
-extern volatile char ispostingAlc;
 void task_genrsa(void *);
 void task_getclientcert(void *);
 void restore_clicert( 	mbedtls_x509_crt ** cert,mbedtls_pk_context ** pk_ctx_dcert  );
-void send_alc_reading(void * alc);
 extern volatile char isgettingsched;
 extern char * netsched;
 extern mbedtls_x509_crt * clicert;

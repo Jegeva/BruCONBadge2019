@@ -13,7 +13,6 @@
 
 void MapWestL(void* arg);
 void MapNovoL(void* arg);
-uint32_t VivaLaVodkaL(void* arg);
 
 
 

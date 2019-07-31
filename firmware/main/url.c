@@ -304,35 +304,6 @@ char * postfile(char * action, char * fieldname,char* filename,char * fileconten
 
 }
 
-volatile char ispostingAlc;
-void send_alc_reading(void * valc){
-  uint32_t *alc = (uint32_t *)valc;
-  unsigned char buf[512];int ret;
-  printf("sending score: %d\n",*alc);
-  ispostingAlc=1;
-  ret = initurl();
-  if(ret != 0){
-    printf( " ssl init failed\n" );
-    disconnect_ssl();
-    ispostingAlc=0;
-    printf("posting alcool failed, sorry, meh...\n");
-    while(1){ vTaskDelay(10000);
-    }
-  }
-  int len = sprintf((char*)buf,"GET " POSTMEASURE "?reading=%d HTTP/1.0\r\nHost: "BADGE_HOST "\r\n\r\n",*alc );
-  ret = mbedtls_ssl_write( ssl, buf, len);
-  if(ret < 0){
-    printf("ss error -%04x = %d , %s\n",-ret,len,buf);
-  }
-  ret = read_http_response((char **)&buf,&len,1);
-  printf("%d %s",len,buf);
-  disconnect_ssl();
-  ispostingAlc=0;
-  
-  while(1){ vTaskDelay(10000);
-  }
-}
-
 void get_sched_task(void * arg)
 {
 	(void) get_sched();

@@ -3,7 +3,6 @@
 #include "img_map.h"
 #include "img_westvleteren.h"
 #include "font_opensans_10.h"
-#include "brucon_adc.h"
 #include "brucon_nvs.h"
 
 #include <freertos/task.h>
@@ -341,12 +340,6 @@ void init_lcd(int type)
     io_conf.pull_down_en = 0;
     io_conf.pull_up_en = 0;
     gpio_config(&io_conf);
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1<<PIN_HEATER_ALC);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
 }
 
 
@@ -408,91 +401,6 @@ void lcd_sync()
 void bruconlogo()
 {
     draw_image(&img_brucon, 0, 0);
-}
-
-#define RAND_NR_STR 13
-char * radnstr[RAND_NR_STR] = {
-//  "Drink reponsibly"
-    "drive",
-    "dd",
-    "sudo",
-    "ssh 2 production",
-    "devops",
-    "update firmware",
-    "write in c",
-    "write in ASM",
-    "write shellcodes",
-    "heap feng shui",
-    "heap spray",
-    "0 day",
-    "solder",
-
-};
-
-
-
-uint32_t VivaLaVodkaL(void* arg){
-    preventbacklighttimeoutTask = 1;
-
-    TaskHandle_t Tasktemp;
-    int32_t score = getBruCONConfigUint32("AlcCal");
-    gpio_config_t io_conf;
-    char * tmp_str = (char*)calloc(50,sizeof(char));
-    io_conf.intr_type = GPIO_PIN_INTR_DISABLE;
-    io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1<<PIN_HEATER_ALC);
-    io_conf.pull_down_en = 0;
-    io_conf.pull_up_en = 0;
-    gpio_config(&io_conf);
-    gpio_set_level(PIN_HEATER_ALC,1);
-    lcd_clearB12(B12_BLACK);
-    lcd_setStr("DrinkResponsibly",2,0,B12_WHITE,0,1,0);
-    lcd_setStr("  This is a TOY",18,0,B12_WHITE,0,1,0);
-    lcd_setStr(" DO NOT TRUST IT",34,0,B12_RED,0,1,0);
-    lcd_setStr(" Don't drink &",56,0,B12_WHITE,0,1,0);
-    char * p =radnstr[esp_random()%RAND_NR_STR];
-    lcd_setStr(p,72,64-((strlen(p)/2)*8),B12_WHITE,0,1,0);
-    TickType_t tickstart = xTaskGetTickCount();
-    lcd_sync();
-    while((xTaskGetTickCount() -  tickstart) < 2000 ){
-        lcd_setStr(" Sensor heating",95,0,B12_RED,0,1,0);
-        lcd_sync();
-        vTaskDelay(400 / portTICK_PERIOD_MS);
-        lcd_setRect(90,0,108 ,131, 1, 0);
-        lcd_sync();
-        vTaskDelay(400 / portTICK_PERIOD_MS);
-
-    }
-    tickstart = xTaskGetTickCount();
-    getAlcSens=1;
-    xTaskCreate( &  getAlcTask  , "getAlc" , 4096, NULL , 5| portPRIVILEGE_BIT , &Tasktemp );
-    while((xTaskGetTickCount() -  tickstart) < 1500 ){
-        lcd_setStr(" Blow on Sensor",90,0,B12_GREEN,0,1,0);
-        lcd_sync();
-        vTaskDelay(400 / portTICK_PERIOD_MS);
-        lcd_setRect(90,0,108 ,131, 1, 0);
-        lcd_sync();
-        vTaskDelay(400 / portTICK_PERIOD_MS);
-
-    }
-
-    gpio_set_level(PIN_HEATER_ALC,0);
-    while(getAlcSens){
-      vTaskDelay(200);
-    };
-    vTaskDelete(Tasktemp);
-    score = abs(Alc_level - score);
-    if(score < 0)
-      score=0;
-    lcd_setRect(90,0,108 ,131, 1, 0);
-    sprintf(tmp_str,"C2H6O lvl:%d",score);
-    lcd_setStr(tmp_str,95,0,B12_WHITE,0,1,0);
-    lcd_sync();
-    printf("ALC SCORE:%d\n",score);
-    preventbacklighttimeoutTask = 0;
-    last_click = xTaskGetTickCount();
-    free(tmp_str);
-    return score;
 }
 
 void MapWestL(void* arg)
