@@ -1,7 +1,9 @@
 #include "menu.h"
 #include "nokialcd.h"
 #include "expat.h"
-
+#ifdef CONFIG_HARDWARE_2019
+#include "touch.h"
+#endif
 
 uint8_t    menu_dirty    = 1;
 uint8_t    currselected  = 0;
@@ -80,7 +82,7 @@ void dispSchedItem(void* arg){
         break;
     case 'T':
         sprintf(wrkstr,"Type: Talk");
-    break;
+        break;
 
     case 'L':
         sprintf(wrkstr,"Type: General");
@@ -89,11 +91,11 @@ void dispSchedItem(void* arg){
     case 'V':
         sprintf(wrkstr,"Type: Village");
 
-    break;
+        break;
 
     case 'S':
         sprintf(wrkstr,"Type: Sp3ci4l");
-    break;
+        break;
     default:
         printf("unknown type %c\n",currMenuItem->schedtype);
     }
@@ -104,7 +106,7 @@ void dispSchedItem(void* arg){
     lcd_setStr(currMenuItem->menuText+12,48,0,B12_WHITE,B12_RED,0,1);
     lcd_setRect(46,0, 46,131, 1, 0);
     if(currMenuItem->schedspk != NULL)
-    lcd_setStr(currMenuItem->schedspk,96,0,B12_BLACK,B12_WHITE,0,1);
+        lcd_setStr(currMenuItem->schedspk,96,0,B12_BLACK,B12_WHITE,0,1);
     lcd_setRect(94,0, 94,131, 1, 0);
     free(wrkstr);
     fakeplaceholder.parent = currMenuItem;
@@ -329,13 +331,13 @@ void parserSchedTreeT(menuItp acurrmenuItem,const cJSON* subtree, int depth){
 }
 
 void parserSchedTree(const cJSON* tree){
-  schedhead_d1 = calloc(1,sizeof(struct menuIt));
-  schedhead_d2 = calloc(1,sizeof(struct menuIt));
-  schedhead_d3 = calloc(1,sizeof(struct menuIt));
+    schedhead_d1 = calloc(1,sizeof(struct menuIt));
+    schedhead_d2 = calloc(1,sizeof(struct menuIt));
+    schedhead_d3 = calloc(1,sizeof(struct menuIt));
 
-  parserSchedTreeT(schedhead_d1,tree->child,0);
-  parserSchedTreeT(schedhead_d2,tree->child->next,0);
-  parserSchedTreeT(schedhead_d3,tree->child->next->next,0);
+    parserSchedTreeT(schedhead_d1,tree->child,0);
+    parserSchedTreeT(schedhead_d2,tree->child->next,0);
+    parserSchedTreeT(schedhead_d3,tree->child->next->next,0);
 
 }
 cJSON * parserMenuJson(const char* jsonstring,uint8_t issched){
@@ -361,13 +363,13 @@ cJSON * parserMenuJson(const char* jsonstring,uint8_t issched){
 
 
 void set_status_bar_text(char * b){
-  int blen = strlen(b);
-  if(blen > statusbartextallocedssz){
-    statusbartext = realloc(statusbartext,blen+1);
-    statusbartextallocedssz = blen+1;    
-  }
-  strncpy(statusbartext,b,blen);
-  *(statusbartext+blen+1)=0;  
+    int blen = strlen(b);
+    if(blen > statusbartextallocedssz){
+        statusbartext = realloc(statusbartext,blen+1);
+        statusbartextallocedssz = blen+1;
+    }
+    strncpy(statusbartext,b,blen);
+    *(statusbartext+blen+1)=0;
 }
 
 char used[7];
@@ -412,21 +414,21 @@ void display_skeleton()
 }
 
 gpio_num_t pins_buttons[7] = { 
-PIN_BL,
-PIN_BR,
-PIN_BU,
-PIN_BD,
-PIN_BA,
-PIN_BB,
-PIN_NCHARGING
+    PIN_BL,
+    PIN_BR,
+    PIN_BU,
+    PIN_BD,
+    PIN_BA,
+    PIN_BB,
+    PIN_NCHARGING
 };
 
 char pins_levels[7] ;
 TickType_t pins_debounce[7];
 TickType_t last_click;
 
-
-static xQueueHandle gpio_evt_queue = NULL;
+#ifdef CONFIG_HARDWARE_2018
+ xQueueHandle gpio_evt_queue ;
 
 static void gpio_task_example(void* arg)
 {
@@ -479,15 +481,54 @@ static void gpio_task_example(void* arg)
     }
 }
 
-
-
 static void IRAM_ATTR handler_gpio_buttons(void *args) {
   
-  uint32_t gpio_num = (uint32_t) args;
-  xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+    uint32_t gpio_num = (uint32_t) args;
+
+
+    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+}
+#endif
+#ifdef CONFIG_HARDWARE_2019
+extern xQueueHandle gpio_evt_queue ;
+
+static void gpio_task_example(void* arg)
+{
+    uint32_t io_num;
+    int pinrank=0;
+    for(;;) {
+        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+            switch(io_num){
+            case PIN_BL:
+                pinrank=0;
+                break;
+            case PIN_BR:
+                pinrank=1;
+                break;
+            case PIN_BU:
+                pinrank=2;
+                break;
+            case PIN_BD:
+                pinrank=3;
+                break;
+            case PIN_BA:
+                pinrank=4;
+                break;
+            case PIN_BB:
+                pinrank=5;
+                break;
+            }
+            if( (xTaskGetTickCount()-pins_debounce[pinrank]) > 10){
+                pins_debounce[pinrank]=xTaskGetTickCount();
+                manage_click(io_num,0);
+            }
+            touch_pad_clear_status();
+        }
+    }
 }
 
 
+#endif
 void print_menu(menuItp aitem, int depth){
     menuItp item = aitem;
     int i=depth;
@@ -515,12 +556,20 @@ char * netsched = NULL;
 
 void display_menu(uint8_t clicked_gui_value)
 {
-    int i;
 
     if(! menu_inited){
         menu_inited=1;
 
+
+
+// 2018 hardware
+
+#ifdef CONFIG_HARDWARE_2018
+#pragma message "CONFIG2018"
+        int i;
         gpio_config_t io_conf;
+        gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+
         io_conf.intr_type = GPIO_PIN_INTR_ANYEDGE;
         io_conf.mode = GPIO_MODE_INPUT;
         io_conf.pull_up_en = 0; // all are physically pulled up
@@ -532,13 +581,29 @@ void display_menu(uint8_t clicked_gui_value)
             (1ULL<<PIN_BB )|
             (1ULL<<PIN_BL )
             ;//|            (1ULL<<PIN_NCHARGING );
-
-        //create a queue to handle gpio event from isr
-        gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
         //start gpio task
         xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
+        gpio_config(&io_conf);
 
-
+        gpio_install_isr_service(0);
+        gpio_isr_handler_add(PIN_BL	         , handler_gpio_buttons, (void*)PIN_BL  );
+        gpio_isr_handler_add(PIN_BR	         , handler_gpio_buttons, (void*)PIN_BR  );
+        gpio_isr_handler_add(PIN_BU	         , handler_gpio_buttons, (void*)PIN_BU  );
+        gpio_isr_handler_add(PIN_BD	         , handler_gpio_buttons, (void*)PIN_BD  );
+        gpio_isr_handler_add(PIN_BB	         , handler_gpio_buttons, (void*)PIN_BB  );
+        gpio_isr_handler_add(PIN_BA	         , handler_gpio_buttons, (void*)PIN_BA  );
+        //     gpio_isr_handler_add(PIN_NCHARGING	 , handler_gpio_buttons, (void*)PIN_NCHARGING);
+        printf("gpio handlers installed\n");
+        for(i=0;i<7;i++){
+            pins_levels[i]=1;
+        }
+#endif
+// 2019 hardware
+#ifdef CONFIG_HARDWARE_2019
+#pragma message "CONFIG2019"
+        init_touch();
+        xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
+#endif
         parserMenuJson(menu_json_start,0);
         //   print_menu(menuhead,0);
         currMenuItem = menuhead;
@@ -559,23 +624,9 @@ void display_menu(uint8_t clicked_gui_value)
         switchbacklight(1);
 
         /*    print_menu(schedhead_d1,0);
-        print_menu(schedhead_d2,0);
-        print_menu(schedhead_d3,0);*/
+              print_menu(schedhead_d2,0);
+              print_menu(schedhead_d3,0);*/
 
-        gpio_config(&io_conf);
-
-        gpio_install_isr_service(0);
-        gpio_isr_handler_add(PIN_BL	         , handler_gpio_buttons, (void*)PIN_BL  );
-        gpio_isr_handler_add(PIN_BR	         , handler_gpio_buttons, (void*)PIN_BR  );
-        gpio_isr_handler_add(PIN_BU	         , handler_gpio_buttons, (void*)PIN_BU  );
-        gpio_isr_handler_add(PIN_BD	         , handler_gpio_buttons, (void*)PIN_BD  );
-        gpio_isr_handler_add(PIN_BB	         , handler_gpio_buttons, (void*)PIN_BB  );
-        gpio_isr_handler_add(PIN_BA	         , handler_gpio_buttons, (void*)PIN_BA  );
-        //     gpio_isr_handler_add(PIN_NCHARGING	 , handler_gpio_buttons, (void*)PIN_NCHARGING);
-        printf("gpio handlers installed\n");
-        for(i=0;i<7;i++){
-            pins_levels[i]=1;
-        }
 
     }
   
@@ -587,4 +638,3 @@ void display_menu(uint8_t clicked_gui_value)
 
 
 }
-
