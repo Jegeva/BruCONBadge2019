@@ -8,8 +8,8 @@
 #include "driver/spi_master.h"
 #include "soc/gpio_struct.h"
 #include "driver/gpio.h"
-
-
+#include "battery.h"
+#include "math.h"
 
 void MapWestL(void* arg);
 void MapNovoL(void* arg);
@@ -26,11 +26,6 @@ void MapNovoL(void* arg);
 
 #define PIN_BL CONFIG_CROSS_PIN_BUTTON_LEFT
 #define PIN_BR CONFIG_CROSS_PIN_BUTTON_RIGHT
-
-// for prod
-// do not forget to chqnge the pin numbers
-//
-
 #define PIN_BU CONFIG_CROSS_PIN_BUTTON_UP
 #define PIN_BD CONFIG_CROSS_PIN_BUTTON_DOWN
 #define PIN_BA CONFIG_CROSS_PIN_BUTTON_A
@@ -208,6 +203,7 @@ typedef struct image_s {
 
 void draw_pixel(int x, int y, pixel_t color, unsigned int blend);
 void draw_image(const image_t * img, int x, int y);
+
 
 typedef struct {
     const uint16_t * data;

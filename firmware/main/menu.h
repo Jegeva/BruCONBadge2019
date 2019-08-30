@@ -9,6 +9,7 @@
 #include "lwip/dns.h"
 #include "url.h"
 #include "cJSON.h"
+#include "battery.h"
 void display_menu(uint8_t clicked_gui_value);
 
 typedef struct menuIt * menuItp;
@@ -32,9 +33,9 @@ extern menuItp schedhead_d1;
 extern menuItp schedhead_d2;
 extern menuItp schedhead_d3;
 extern TickType_t last_click;
-
+extern volatile char batt_update;
 extern char * netshed;
-
+extern xQueueHandle gpio_evt_queue ;
 
 
 menuItem * changemenuItem(menuItem *);
@@ -42,6 +43,7 @@ void set_status_bar_text(char * b);
 void defaultmenu();
 void manage_click(uint32_t value,uint32_t level );
 void manage_click_menu(uint32_t value,uint32_t level );
+void display_taskbar();
 
 
 

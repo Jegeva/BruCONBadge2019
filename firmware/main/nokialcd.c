@@ -498,6 +498,8 @@ void lcd_setLine(int x0, int y0, int x1, int y1, int color)
         }
 }
 
+
+
 void lcd_setRect(int x0, int y0, int x1, int y1, unsigned char fill, int color)
 {
     // check if the rectangle is to be filled
