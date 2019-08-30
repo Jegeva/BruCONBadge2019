@@ -104,13 +104,17 @@ void dispSchedItem(void* arg){
     }
 
     lcd_setStr(wrkstr,32,0,B12_BLACK,B12_WHITE,0,1);
-    lcd_setRect(30,0, 30,131, 1, 0);
-    lcd_setRect(47,0, 94,131, 1, B12_RED);
+    //lcd_setRect(30,0, 30,131, 1, 0);
+    lcd_setRect(0, 30, 131, 30, 1, 0);
+    //lcd_setRect(47,0, 94,131, 1, B12_RED);
+    lcd_setRect(0, 47, 131, 94, 1, B12_RED);
     lcd_setStr(currMenuItem->menuText+12,48,0,B12_WHITE,B12_RED,0,1);
-    lcd_setRect(46,0, 46,131, 1, 0);
+    //lcd_setRect(46,0, 46,131, 1, 0);
+    lcd_setRect(0, 46, 131, 46, 1, 0);
     if(currMenuItem->schedspk != NULL)
         lcd_setStr(currMenuItem->schedspk,96,0,B12_BLACK,B12_WHITE,0,1);
-    lcd_setRect(94,0, 94,131, 1, 0);
+    //lcd_setRect(94,0, 94,131, 1, 0);
+    lcd_setRect(0, 94, 131, 94, 1, 0);
     free(wrkstr);
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
@@ -243,12 +247,16 @@ void manage_click_menu(uint32_t value,uint32_t level ){
             return;
 
 
-        lcd_setRect((((oldrank%7)+1)*16)+1,0, (((oldrank%7)+2)*16)-1,131, 1, B12_WHITE);
+        //lcd_setRect((((oldrank%7)+1)*16)+1,0, (((oldrank%7)+2)*16)-1,131, 1, B12_WHITE);
+        lcd_setRect(0, (((oldrank%7)+1)*16)+1, 131, (((oldrank%7)+2)*16)-1, 1, B12_WHITE);
         lcd_setStr(oldmenuitem->menuText,(((oldrank%7)+1)*16)+2,0,B12_BLACK,B12_WHITE,0,0);
-        lcd_setRect((((currselected%7)+1)*16)+1,0, (((currselected%7)+2)*16)-1,131, 1, B12_RED);
+        //lcd_setRect((((currselected%7)+1)*16)+1,0, (((currselected%7)+2)*16)-1,131, 1, B12_RED);
+        lcd_setRect(0, (((currselected%7)+1)*16)+1, 131, (((currselected%7)+2)*16)-1, 1, B12_RED);
         lcd_setStr(currMenuItem->menuText,(((currselected%7)+1)*16)+2,0,B12_WHITE,B12_RED,0,0);
-        lcd_setRect(((oldrank%7)+1)*16,0, ((oldrank%7)+1)*16,131, 1, 0);
-        lcd_setRect(((currselected%7)+1)*16,0,((currselected%7)+1)*16,131, 1, 0);
+        //lcd_setRect(((oldrank%7)+1)*16,0, ((oldrank%7)+1)*16,131, 1, 0);
+        lcd_setRect(0, ((oldrank%7)+1)*16, 131, ((oldrank%7)+1)*16, 1, 0);
+        //lcd_setRect(((currselected%7)+1)*16,0,((currselected%7)+1)*16,131, 1, 0);
+        lcd_setRect(0, ((currselected%7)+1)*16, 131, ((currselected%7)+1)*16, 1, 0);
         menu_dirty=0;
         lcd_sync();
     }
@@ -403,20 +411,30 @@ void display_taskbar()
 
 
 
-    lcd_setRect(0,0, 16,131, 1, 0);
+    //lcd_setRect(0,0, 16,131, 1, 0);
+    lcd_setRect(0, 0, 131, 16, 1, 0);
 
-    lcd_setRect(6,129, 10,131, 1,color );
+    //lcd_setRect(6,129, 10,131, 1,color );
+    lcd_setRect(129, 6, 131, 10, 1, color);
 
-    lcd_setRect(4,115, 12,128, 1,color );
-    lcd_setRect(5,116, 11,127, 1,0 );
-    lcd_setRect(5,116, 11,116 + ceil((float)(11 * ((float)batteryinfo.percent / 100.0F))), 1,B12_WHITE );
+    //lcd_setRect(4,115, 12,128, 1,color );
+    lcd_setRect(115, 4, 128, 12, 1,color );
+    //lcd_setRect(5,116, 11,127, 1,0 );
+    lcd_setRect(116, 5, 127, 11, 1, 0);
+    //lcd_setRect(5,116, 11,116 + ceil((float)(11 * ((float)batteryinfo.percent / 100.0F))), 1,B12_WHITE );
+    lcd_setRect(116, 5, 116 + ceil((float)(11 * ((float)batteryinfo.percent / 100.0F))), 11, 1,B12_WHITE );
 
     if(batteryinfo.powstat & POWSTAT_USB){
-        lcd_setRect( 7,100, 9 ,105, 1,B12_WHITE );
-        lcd_setRect( 5,104, 11,105, 1,B12_WHITE );
-        lcd_setRect( 4,105, 12,108, 1,B12_WHITE );
-        lcd_setRect( 6,108, 6 ,111, 1,B12_WHITE );
-        lcd_setRect( 10,108, 10 ,111, 1,B12_WHITE );
+        //lcd_setRect( 7,100, 9 ,105, 1,B12_WHITE );
+        lcd_setRect( 100, 7, 105, 9, 1, B12_WHITE );
+        //lcd_setRect( 5,104, 11,105, 1,B12_WHITE );
+        lcd_setRect( 104, 5, 105, 11, 1, B12_WHITE );
+        //lcd_setRect( 4,105, 12,108, 1,B12_WHITE );
+        lcd_setRect( 105, 4, 108,12, 1, B12_WHITE );
+        //lcd_setRect( 6,108, 6 ,111, 1,B12_WHITE );
+        lcd_setRect( 108, 6, 111, 6, 1, B12_WHITE );
+        //lcd_setRect( 10,108, 10 ,111, 1,B12_WHITE );
+        lcd_setRect( 108, 10, 111, 10, 1, B12_WHITE );
     }
 }
 
@@ -428,10 +446,12 @@ void display_skeleton()
     menuItem * dispmenuitem = currMenuItem;
     if(! skeleton_inited){
         lcd_clearB12(B12_WHITE);
-        lcd_setRect((currselected+1)*16,0, (currselected+2)*16,131, 1, B12_RED);
+        //lcd_setRect((currselected+1)*16,0, (currselected+2)*16,131, 1, B12_RED);
+        lcd_setRect(0, (currselected+1)*16, 131, (currselected+2)*16, 1, B12_RED);
         skeleton_inited = 1;
     }
-    lcd_setRect(0,0, 16,131, 1, 0);
+    //lcd_setRect(0,0, 16,131, 1, 0);
+    lcd_setRect(0,0, 131, 16, 1, 0);
 
 #ifdef CONFIG_HARDWARE_2019
     // batt graph skel
@@ -449,7 +469,8 @@ void display_skeleton()
     while( (i < 7) && (dispmenuitem != NULL) ){
         if(used[i]){
 
-            lcd_setRect(((i+1)*16)+1,0, ((i+2)*16)-1,131, 1, (i== (currselected%7) )?B12_RED:B12_WHITE);
+            //lcd_setRect(((i+1)*16)+1,0, ((i+2)*16)-1,131, 1, (i== (currselected%7) )?B12_RED:B12_WHITE);
+            lcd_setRect(0, ((i+1)*16)+1, 131, ((i+2)*16)-1, 1, (i== (currselected%7) )?B12_RED:B12_WHITE);
         }
 
         used[i]=1;
@@ -460,12 +481,14 @@ void display_skeleton()
     while(( i < 7) && used[i])
     {
         used[i]=0;
-        lcd_setRect(((i+1)*16)+1,0, ((i+2)*16)-1,131, 1, B12_WHITE);
+        //lcd_setRect(((i+1)*16)+1,0, ((i+2)*16)-1,131, 1, B12_WHITE);
+        lcd_setRect(0, ((i+1)*16)+1, 131, ((i+2)*16)-1, 1, B12_WHITE);
         i++;
     }
 
     for(i=1;i<8;i++)
-        lcd_setRect(i*16,0, i*16,131, 1, 0);
+        //lcd_setRect(i*16,0, i*16,131, 1, 0);
+        lcd_setRect(0, i*16, 131, i*16, 1, 0);
 
     lcd_sync();
 }

@@ -25,10 +25,11 @@
 
 #define WIFI_CONNECT_TIMEOUT 10
 
-enum GUI_MAIN_STATE_E { GSTATE_INIT, GSTATE_MAIN_MENU, GSTATE_MENU_CLICKED ,GSTATE_FETCHING_SCHED, GSTATE_ENROLLING};
+enum GUI_MAIN_STATE_E { GSTATE_INIT, GSTATE_MAIN_MENU, GSTATE_MENU_CLICKED ,GSTATE_FETCHING_SCHED, GSTATE_ENROLLING, GSTATE_NICK};
 enum GUI_MAIN_STATE_E main_state= GSTATE_INIT;
 bool clicked_gui = true;
 uint8_t clicked_gui_value = 0;
+char *nick = NULL;
 
 uint8_t mac[6] ;
 volatile char* macstr;
@@ -55,6 +56,8 @@ void manage_click(uint32_t value,uint32_t level ){
   case GSTATE_FETCHING_SCHED:
     break;
   case GSTATE_ENROLLING:
+      break;
+  case GSTATE_NICK:
       break;
 
   }
@@ -143,7 +146,10 @@ void gui()
               for (int i = 0 ; i<10;i++)
                   printf("NO WIFI, fallbacl ! \n");
 
-              main_state = GSTATE_MAIN_MENU;
+              if (!nick)
+                  main_state = GSTATE_NICK;
+              else
+                  main_state = GSTATE_MAIN_MENU;
           }
       }
       *(tut+16)=0;
@@ -151,6 +157,11 @@ void gui()
       lcd_sync();
       vTaskDelay(500 / portTICK_PERIOD_MS);
       break;
+
+    case GSTATE_NICK:
+        nick = get_keyboard_input();
+        main_state = GSTATE_MAIN_MENU;
+        break;
 
     case GSTATE_ENROLLING:
         if(isgettingClientCert){

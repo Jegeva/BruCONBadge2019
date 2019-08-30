@@ -511,9 +511,8 @@ void lcd_setRect(int x0, int y0, int x1, int y1, unsigned char fill, int color)
         ystart = min(y0, y1);
         yend   = max(y0, y1);
 
-        /* TODO: x & y swapped ??? */
-        for (int y = xstart; y <= xend; y++)
-            for (int x = ystart; x <= yend; x++)
+        for (int y = ystart; y <= yend; y++)
+            for (int x = xstart; x <= xend; x++)
                 frame[y * ROW_LENGTH + x] = color;
     }
     else {
