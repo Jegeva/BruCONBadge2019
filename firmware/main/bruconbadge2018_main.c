@@ -34,7 +34,7 @@ uint8_t mac[6] ;
 volatile char* macstr;
 char* hostname;
 
-uint8_t click_value,click_level;
+uint32_t click_value,click_level;
 
 
 void manage_click(uint32_t value,uint32_t level ){
@@ -72,8 +72,10 @@ void backlighttimeoutTask()
        
         if(!preventbacklighttimeoutTask)
         if((xTaskGetTickCount()-last_click)>1000){
-	  printf("backlighttimeout: %d\n",xTaskGetTickCount()-last_click);
-	  switchbacklight(0);
+            printf("backlighttimeout: %d\n",xTaskGetTickCount()-last_click);
+            switchbacklight(0);
+            stop_bat_task();
+
         }
 
     }
@@ -166,7 +168,7 @@ void gui()
                 xTaskCreatePinnedToCore( task_getclientcert , "getClientCert" , 8192, NULL , 5| portPRIVILEGE_BIT , &Tasktemp ,0);
             } else {
                 vTaskDelete(Tasktemp);
-		restore_clicert(&clicert,&pk_ctx_clicert);
+                restore_clicert(&clicert,&pk_ctx_clicert);
                 main_state=GSTATE_FETCHING_SCHED;
 		switchbacklight(1);
             }

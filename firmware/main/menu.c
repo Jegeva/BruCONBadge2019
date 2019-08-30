@@ -3,6 +3,7 @@
 #include "expat.h"
 #ifdef CONFIG_HARDWARE_2019
 #include "touch.h"
+#include "math.h"
 #endif
 
 uint8_t    menu_dirty    = 1;
@@ -17,6 +18,8 @@ menuItp schedhead_d2;
 menuItp schedhead_d3;
 
 menuItem fakeplaceholder;
+
+void display_skeleton();
 
 
 void fixparent(menuItp p, menuItp h)
@@ -140,6 +143,8 @@ void manage_click_menu(uint32_t value,uint32_t level ){
     int oldrank=currselected;
     menuItem * oldmenuitem = currMenuItem;
 
+//r    printf("click : %d\n",value);
+
     if(currMenuItem == NULL){
         printf("CURR NULL!\n");
 
@@ -149,16 +154,28 @@ void manage_click_menu(uint32_t value,uint32_t level ){
     //  if(value == PIN_NCHARGING){
     //     printf("clkc: ncharg %d \n",level);
     // }
+    if(value == 9999)
+        level = 0;
 
     if(level==0){
 //        printf("clkc: %d \n",value);
-        if(value != PIN_NCHARGING){
+        if(value != PIN_NCHARGING  && value != 9999){
 
             switchbacklight(1);
             last_click=xTaskGetTickCount();
+            start_bat_task();
+
+
         }
 
         switch(value){
+        case 9999:
+            display_taskbar();
+
+            printf("battery update : %d vbat : %d mV %d%%\n",  batteryinfo.powstat,batteryinfo.vbat,batteryinfo.percent);
+            batt_update=0;
+            lcd_sync();
+            return;
         case PIN_BL:
             if(currMenuItem->parent != NULL){
                 currMenuItem = currMenuItem->parent;
@@ -374,6 +391,36 @@ void set_status_bar_text(char * b){
 
 char used[7];
 
+void display_taskbar()
+{
+    uint32_t color = B12_GREEN;
+    if( (batteryinfo.powstat & POWSTAT_USB) == 0) {
+        color = B12_GREEN;
+    } else {
+        if( ((batteryinfo.powstat & POWSTAT_STAT1)>0) ==  ((batteryinfo.powstat & POWSTAT_STAT2)>0))
+            color = B12_RED;
+    }
+
+
+
+    lcd_setRect(0,0, 16,131, 1, 0);
+
+    lcd_setRect(6,129, 10,131, 1,color );
+
+    lcd_setRect(4,115, 12,128, 1,color );
+    lcd_setRect(5,116, 11,127, 1,0 );
+    lcd_setRect(5,116, 11,116 + ceil((float)(11 * ((float)batteryinfo.percent / 100.0F))), 1,B12_WHITE );
+
+    if(batteryinfo.powstat & POWSTAT_USB){
+        lcd_setRect( 7,100, 9 ,105, 1,B12_WHITE );
+        lcd_setRect( 5,104, 11,105, 1,B12_WHITE );
+        lcd_setRect( 4,105, 12,108, 1,B12_WHITE );
+        lcd_setRect( 6,108, 6 ,111, 1,B12_WHITE );
+        lcd_setRect( 10,108, 10 ,111, 1,B12_WHITE );
+    }
+}
+
+
 void display_skeleton()
 {
     int i;
@@ -385,6 +432,16 @@ void display_skeleton()
         skeleton_inited = 1;
     }
     lcd_setRect(0,0, 16,131, 1, 0);
+
+#ifdef CONFIG_HARDWARE_2019
+    // batt graph skel
+    display_taskbar();
+    enable_bat_interrupts();
+
+
+
+//    lcd_setRect(3,120, 13,128, 1,B12_WHITE );
+#endif
 
     while((dispmenuitem->prev != NULL) && (dispmenuitem->rank %7 ) )
         dispmenuitem=dispmenuitem->prev;
@@ -440,6 +497,8 @@ static void gpio_task_example(void* arg)
     for(;;) {
         if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
             level = gpio_get_level(io_num);
+            printf("gpio evt : %d",io_num);
+
             switch(io_num){
             case PIN_BL:
                 pinrank=0;
@@ -462,6 +521,7 @@ static void gpio_task_example(void* arg)
             case PIN_NCHARGING:
                 pinrank=6;
                 break;
+
             default:
                 return;
                 break;
@@ -478,6 +538,8 @@ static void gpio_task_example(void* arg)
             if( (lastlevel) && (level==0))
                 manage_click(io_num,level);
         }
+
+
     }
 }
 
@@ -491,6 +553,7 @@ static void IRAM_ATTR handler_gpio_buttons(void *args) {
 #endif
 #ifdef CONFIG_HARDWARE_2019
 extern xQueueHandle gpio_evt_queue ;
+char enable_input = 0;
 
 static void gpio_task_example(void* arg)
 {
@@ -498,6 +561,7 @@ static void gpio_task_example(void* arg)
     int pinrank=0;
     for(;;) {
         if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+            //           printf("gpio evt : %d",io_num);
             switch(io_num){
             case PIN_BL:
                 pinrank=0;
@@ -516,6 +580,10 @@ static void gpio_task_example(void* arg)
                 break;
             case PIN_BB:
                 pinrank=5;
+                break;
+            case 9999:
+                pinrank=6;
+
                 break;
             }
             if( (xTaskGetTickCount()-pins_debounce[pinrank]) > 10){
@@ -603,6 +671,8 @@ void display_menu(uint8_t clicked_gui_value)
 #pragma message "CONFIG2019"
         init_touch();
         xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
+        update_batteryinfo();
+
 #endif
         parserMenuJson(menu_json_start,0);
         //   print_menu(menuhead,0);
@@ -622,6 +692,7 @@ void display_menu(uint8_t clicked_gui_value)
             parserMenuJson(sched_json_start,1);
         }
         switchbacklight(1);
+        start_bat_task();
 
         /*    print_menu(schedhead_d1,0);
               print_menu(schedhead_d2,0);
