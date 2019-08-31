@@ -8,7 +8,7 @@
 #define CHAR_X_OFFSET   1
 #define CHAR_Y_OFFSET   4
 #define CHARSET_LEN     45
-#define INPUT_MAX_LEN   16
+#define INPUT_MAX_LEN   15
 #define ENT_NEG         4
 #define ENT_BTN         44
 
@@ -39,6 +39,20 @@ static void draw_keyboard()
     int ctr = 0;
 
     //lcd_clearB12(B12_WHITE);
+
+    lcd_setRect(KB_STARTX, 
+            KB_STARTY - BLK_HEIGHT - 2, 
+            SCREEN_EDGE - 2, 
+            KB_STARTY - 2, 
+            1, 
+            B12_WHITE);
+    
+    lcd_setRect(KB_STARTX, 
+            KB_STARTY - BLK_HEIGHT - 2, 
+            SCREEN_EDGE - 2, 
+            KB_STARTY - 2, 
+            0, 
+            B12_BLACK);
 
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 9; j++, ctr++) {
@@ -176,7 +190,29 @@ static void draw_selection(uint8_t old, uint8_t new)
                 0,
                 0);
     }
+   
+    lcd_setRect(KB_STARTX, 
+            KB_STARTY - BLK_HEIGHT - 2, 
+            SCREEN_EDGE - 2, 
+            KB_STARTY - 2, 
+            1, 
+            B12_WHITE);
     
+    lcd_setRect(KB_STARTX, 
+            KB_STARTY - BLK_HEIGHT - 2, 
+            SCREEN_EDGE - 2, 
+            KB_STARTY - 2, 
+            0, 
+            B12_BLACK);
+
+    lcd_setStr(input,
+            KB_STARTY - BLK_HEIGHT - 2 + CHAR_X_OFFSET,
+            KB_STARTX + CHAR_Y_OFFSET,
+            B12_BLACK,
+            B12_WHITE,
+            0,
+            0);
+ 
 }
 
 static void btn_click_handler(uint32_t io_num, uint32_t level)
@@ -212,7 +248,7 @@ static void btn_click_handler(uint32_t io_num, uint32_t level)
         break;
     case PIN_BA:
         if (curr_len) {
-            input[curr_len] = '\0';
+            input[curr_len - 1] = '\0';
             curr_len--;
             dirty = 1;
         }
