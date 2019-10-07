@@ -117,7 +117,7 @@ uint32_t get_bat_voltage()
     raw/= NO_OF_SAMPLES;
 
     // falls short by 100mV on high side for some reason
-    raw = (esp_adc_cal_raw_to_voltage(raw, adc_chars)) * 127 / 100 ;
+    raw = (esp_adc_cal_raw_to_voltage(raw, adc_chars))  ;
 
     return raw ;
 }
