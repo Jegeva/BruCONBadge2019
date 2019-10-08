@@ -8,13 +8,8 @@
 #define WIFI_SSID      ""
 
 
-char * get_wifi_netname();
-char * get_wifi_pass();
-char * get_client_cert();
-
-char * set_wifi_netname();
-char * set_wifi_pass();
-char * set_client_cert();
+const char * get_wifi_netname();
+const char * get_wifi_pass();
 
 
 #endif

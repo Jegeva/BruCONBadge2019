@@ -9,20 +9,20 @@
 
 #define POSTENROLLURL
 
-char * badgehost = BADGE_HOST;
+const char * badgehost = BADGE_HOST;
 volatile char hostfound = 0;
 ip_addr_t badgesrvip;
 struct sockaddr_in server_addr;
 struct hostent *server_host;
 
-mbedtls_x509_crt * certchain;
+mbedtls_x509_crt * certchain = NULL;
 volatile char mbtlsinited = 0;
 
-mbedtls_net_context *server_fd;
-mbedtls_entropy_context *entropy;
-mbedtls_ctr_drbg_context *ctr_drbg;
-mbedtls_ssl_context *ssl;
-mbedtls_ssl_config *conf;
+mbedtls_net_context *server_fd = NULL;
+mbedtls_entropy_context *entropy = NULL;
+mbedtls_ctr_drbg_context *ctr_drbg = NULL;
+mbedtls_ssl_context *ssl = NULL;
+mbedtls_ssl_config *conf = NULL;
 
 
 #define BRUCON_SSL_VERBOSE
@@ -38,20 +38,22 @@ void dns_found_cb(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
 
 int initmbtls()
 {
-  int ret;
-  if(!mbtlsinited){
+    int ret;
+    if(!mbtlsinited){
 
-    server_fd = (mbedtls_net_context*)calloc(1,sizeof(mbedtls_net_context));
+
     entropy= (mbedtls_entropy_context*)calloc(1,sizeof(mbedtls_entropy_context));
     ctr_drbg= (mbedtls_ctr_drbg_context*)calloc(1,sizeof(mbedtls_ctr_drbg_context));
-    ssl= (mbedtls_ssl_context*)calloc(1,sizeof(mbedtls_ssl_context));
     conf= (mbedtls_ssl_config*)calloc(1,sizeof(mbedtls_ssl_config));
     certchain=(mbedtls_x509_crt*)calloc(1,sizeof(mbedtls_x509_crt));
-    printf("init ssl context\n");
+
+
+
+    printf("init ssl context %p %p %p %p\n",entropy,ctr_drbg,conf,certchain);
     mbedtls_x509_crt_init( certchain  );
     //  printf("Cert: %s\n",server_root_cert_pem_start);
     if( (ret=mbedtls_x509_crt_parse(certchain,server_root_cert_pem_start,server_root_cert_pem_end-server_root_cert_pem_start)) != 0){
-      printf("Error parsing cert : %d\n",ret);
+        printf("Error parsing cert : %d\n",ret);
     }
     //     printf("Cert : %s %s\n",certchain->subject.val.p,certchain->issuer.val.p);
   
@@ -61,36 +63,37 @@ int initmbtls()
     mbedtls_ctr_drbg_init( ctr_drbg );
     mbedtls_ssl_conf_ca_chain( conf, certchain, NULL ); 
     if( ( ret = mbedtls_ctr_drbg_seed( ctr_drbg,
-				       //mybsmbedtls_entropy_func,
-				       mbedtls_entropy_func,
-				       entropy,
-				       (uint8_t * ) macstr, //ESP_MAC_WIFI_STA,//(const unsigned char *) pers,
-				       strlen( (const char*)macstr) //ESP_MAC_WIFI_STA //pers
-				       )) != 0 )
-      {
-	printf( " failed\n  ! mbedtls_ctr_drbg_seed returned %d\n", ret );
-	return 0;
-      }
+                                       //mybsmbedtls_entropy_func,
+                                       mbedtls_entropy_func,
+                                       entropy,
+                                       (uint8_t * ) macstr, //ESP_MAC_WIFI_STA,//(const unsigned char *) pers,
+                                       strlen( (const char*)macstr) //ESP_MAC_WIFI_STA //pers
+              )) != 0 )
+    {
+        printf( " failed\n  ! mbedtls_ctr_drbg_seed returned %d\n", ret );
+        return 0;
+    }
     if( ( ret = mbedtls_ssl_config_defaults( conf,
-					     MBEDTLS_SSL_IS_CLIENT,
-					     MBEDTLS_SSL_TRANSPORT_STREAM,
-					     MBEDTLS_SSL_PRESET_DEFAULT ) ) != 0 )	{
-      mbedtls_printf( " failed\n  ! mbedtls_ssl_config_defaults returned %d\n\n", ret );
+                                             MBEDTLS_SSL_IS_CLIENT,
+                                             MBEDTLS_SSL_TRANSPORT_STREAM,
+                                             MBEDTLS_SSL_PRESET_DEFAULT ) ) != 0 )	{
+        mbedtls_printf( " failed\n  ! mbedtls_ssl_config_defaults returned %d\n\n", ret );
     }
     mbedtls_ssl_conf_authmode( conf, MBEDTLS_SSL_VERIFY_REQUIRED );
     mbedtls_ssl_conf_rng( conf, mbedtls_ctr_drbg_random, ctr_drbg );
     if(getBruCONConfigFlag("haveClientCert")!=0){
-      printf("Setting clicert %p %p\n",clicert,pk_ctx_clicert);
-      if((ret = mbedtls_ssl_conf_own_cert(conf,clicert,pk_ctx_clicert))!=0){
-	printf("ERROR own cert :-0x%x\n",ret);
-      }
+        printf("Setting clicert %p %p\n",clicert,pk_ctx_clicert);
+        if((ret = mbedtls_ssl_conf_own_cert(conf,clicert,pk_ctx_clicert))!=0){
+            printf("ERROR own cert :-0x%x\n",ret);
+        }
     }
     mbedtls_ssl_conf_renegotiation(conf,MBEDTLS_SSL_RENEGOTIATION_ENABLED );
   
     mbtlsinited = 1;
-    return 1;
-  }
-  return mbtlsinited;
+    }
+
+    return mbtlsinited;
+
 }
 
 	
@@ -99,51 +102,65 @@ int initmbtls()
 
 void solvebadgehost()
 {
-  if(!hostfound){
-    dns_gethostbyname(badgehost, &badgesrvip, dns_found_cb, NULL );
-    while(!hostfound);
-  }
+    if(!hostfound){
+        dns_gethostbyname(badgehost, &badgesrvip, dns_found_cb, NULL );
+        while(!hostfound);
+    }
 }
 
+static void my_debug( void *ctx, int level,
+                      const char *file, int line, const char *str )
+{
+    //((void) level);
+    printf("conf dbg %s:%04d: %s", file, line, str );
+
+}
 
 int connectssl()
 {
-  int ret;
-  char buf[512];
-  mbedtls_net_init( server_fd );
-  mbedtls_ssl_init( ssl );
-  if( ( ret = mbedtls_net_connect( server_fd, BADGE_HOST, "443", MBEDTLS_NET_PROTO_TCP ) ) != 0 )
+    int ret;
+    char buf[100];
+    server_fd = (mbedtls_net_context*)calloc(1,sizeof(mbedtls_net_context));
+    mbedtls_net_init( server_fd );
+    ssl= (mbedtls_ssl_context*)calloc(1,sizeof(mbedtls_ssl_context));
+    printf("connectssl %p %p\n",server_fd,ssl);
+
+    mbedtls_ssl_init( ssl );
+    if( ( ret = mbedtls_net_connect( server_fd, BADGE_HOST, "443", MBEDTLS_NET_PROTO_TCP ) ) != 0 )
     {        printf( " failed\n  ! mbedtls_net_connect returned %d\n\n", ret );    }
    
-  if(getBruCONConfigFlag("haveClientCert")!=0){
-    // printf("Setting clicert %p %p\n",clicert,pk_ctx_clicert);
-    if((ret = mbedtls_ssl_conf_own_cert(conf,clicert,pk_ctx_clicert))!=0){
-      printf("ERROR own cert :-0x%x\n",ret);
-    }
-  }
+    /* if(getBruCONConfigFlag("haveClientCert")!=0){
+        // printf("Setting clicert %p %p\n",clicert,pk_ctx_clicert);
+        if((ret = mbedtls_ssl_conf_own_cert(conf,clicert,pk_ctx_clicert))!=0){
+            printf("ERROR own cert :-0x%x\n",ret);
+        }
+        }*/
    
-  //   mbedtls_ssl_conf_dbg( &conf, my_debug, stdout );
-  if( ( ret = mbedtls_ssl_setup( ssl, conf ) ) != 0 )
-    {mbedtls_strerror (ret,buf, 512);
-      mbedtls_printf( " failed\n  ! mbedtls_ssl_setup returned %x\n%s\n", ret,buf );
-    }
-  if( ( ret = mbedtls_ssl_set_hostname( ssl, BADGE_HOST) ) != 0 )
+//    mbedtls_ssl_conf_dbg( conf, my_debug, stdout );
+    if( ( ret = mbedtls_ssl_setup( ssl, conf ) ) != 0 )
     {
-      mbedtls_printf( " failed\n  ! mbedtls_ssl_set_hostname returned %d\n\n", ret );
+        mbedtls_strerror (ret,buf, 100);
+        mbedtls_printf( " failed\n  ! mbedtls_ssl_setup returned %x\n%s\n", ret,buf );
     }
-  mbedtls_ssl_set_bio( ssl, server_fd, mbedtls_net_send, mbedtls_net_recv, NULL );
-  while( ( ret = mbedtls_ssl_handshake( ssl ) ) != 0 )
+    if( ( ret = mbedtls_ssl_set_hostname( ssl, BADGE_HOST) ) != 0 )
     {
-      if( ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE )
+        mbedtls_printf( " failed\n  ! mbedtls_ssl_set_hostname returned %d\n\n", ret );
+    }
+    mbedtls_ssl_set_bio( ssl, server_fd, mbedtls_net_send, mbedtls_net_recv, NULL );
+
+
+    while( ( ret = mbedtls_ssl_handshake( ssl ) ) != 0 )
+    {
+        if( ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE )
         {
-	  mbedtls_strerror (ret,buf, 512);
-	  mbedtls_printf( " failed\n  ! mbedtls_ssl_handshake returned -0x%x\n :%s\n", -ret,buf );
-	  //   disconnect_ssl();
-	  return ret;
+            mbedtls_strerror (ret,buf, 100);
+            mbedtls_printf( " failed\n  ! mbedtls_ssl_handshake returned -0x%x\n :%s\n", -ret,buf );
+            disconnect_ssl();
+            return ret;
 
         }
     }
-  return ret;
+    return ret;
 }
 
 int initurl()
@@ -156,37 +173,46 @@ int initurl()
 }
 void disconnect_ssl()
 {
-
+    mbedtls_ssl_close_notify( ssl );
   
     mbedtls_net_free( server_fd );
-    mbedtls_ssl_free( ssl );
+    free(server_fd);
 
-    /*
+    mbedtls_ssl_free( ssl );
+    free(ssl);
+/*
+
     mbedtls_x509_crt_free( certchain );
+    free(certchain);
+
 
     mbedtls_ssl_config_free( conf );
+    free(conf);
+
     mbedtls_ctr_drbg_free( ctr_drbg );
+    free(ctr_drbg);
+
     mbedtls_entropy_free( entropy );
-    free( server_fd );
-    free( certchain );
-    free( ssl );
-    free( conf );
-    free( ctr_drbg );
     free( entropy );
-    mbtlsinited=0;*/
-    
+
+    mbtlsinited=0;
+*/
 
 }
 
 #define BUF_SZ 1024
 int read_http_response(char ** response, int * response_size,char with_headers)
 {
-    unsigned char * buf = (unsigned char *)calloc(BUF_SZ,sizeof(char));
+    unsigned char * buf = NULL;
+
+    buf=(unsigned char *)calloc(BUF_SZ,sizeof(char));
     char init = 1;
     char * contentlen=NULL;
     char * ret_str=NULL;
     int curr_sz = 0;  int len;int ret;
     int code;
+    *response_size=0;
+    int skip = 0;
     do
     {
         len = BUF_SZ - 1;
@@ -194,15 +220,14 @@ int read_http_response(char ** response, int * response_size,char with_headers)
         ret = mbedtls_ssl_read( ssl, buf, len );
         if( ret <= 0 )
         {
-
-	  if(ret != MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY){
-	    printf( "failed\n  ! ssl_read returned -%04x\n\n", -ret );
-	    char * errstr = (char*)calloc(200,sizeof(char));
-	    memset(errstr, 0, 200 );
-	    mbedtls_strerror(ret,errstr,199);
-	    printf("%s",errstr);
-	    free(errstr);
-	  }
+            if(ret != MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY){
+                printf( "failed\n  ! ssl_read returned -%04x\n\n", -ret );
+                char * errstr = (char*)calloc(200,sizeof(char));
+                memset(errstr, 0, 200 );
+                mbedtls_strerror(ret,errstr,199);
+                printf("%s",errstr);
+                free(errstr);
+            }
             * response = ret_str;
             break;
         }
@@ -211,48 +236,54 @@ int read_http_response(char ** response, int * response_size,char with_headers)
             //printf( "\n%d bytes read\n\n%s\n %d -> %d \n", len, (char *) buf, curr_sz, curr_sz+len);
             // skip http headers
             if(!init ){
+
                 memcpy(ret_str+curr_sz,buf,len);
                 curr_sz+=len;
-                *(ret_str+curr_sz+1)=0;
+                *(ret_str+curr_sz)=0;
+                // printf("received %d\n%s\n%s\n",len,buf,ret_str);
+
             } else {
                 // http response headers
+                code=strtoll((char*)buf+9,NULL,10);
+                //printf("HTTPCODE:%d\n%s\n",code,buf);
+                if(code != 200){
+                    *response_size=0;
+                    *response = NULL;
+                    break;
+                }
+                contentlen=strstr((char*)buf,"Content-Length:");
+		
+                if(contentlen != NULL){
+                    //yey have len
+                    *response_size = strtoul(contentlen + 15,NULL,10);
+                    // printf("response size =%d\n",*response_size);
+                    skip = ((unsigned char*)strstr((char*)buf,"\r\n\r\n")) - buf;
+                    if(with_headers)
+                        *response_size += len;
+                    if(*response_size > 100000) // no way not enough ram
+                        return -1;
+                    ret_str = (char*)calloc((*response_size)+10,sizeof(char));
+                    memset( ret_str, 0, (*response_size)+3);
+                } else {
+                    //no len no dice, this is IOT !
+                    return -1;
+                }
+                if(with_headers){
+                    memcpy(ret_str+curr_sz,buf,len);
+                    curr_sz+=len;
+                    *(ret_str+curr_sz+1)=0;
+                } else {
+                    memcpy(ret_str+curr_sz,buf+skip,len-skip);
+                    curr_sz+=len-skip;
+                    *(ret_str+curr_sz+1)=0;
+                }
 
-	      code=strtoll((char*)buf+9,NULL,10);
-	      //	      printf("HTTPCODE:%d %s\n",code,buf);
-	      if(code != 200){
-	
-		*response_size=0;
-		*response = NULL;
-		break;
-		
-	      }
-	      contentlen=strstr((char*)buf,"Content-Length:");
-		
-	      if(contentlen != NULL){
-		//yey have len
-		*response_size = strtoul(contentlen + 15,NULL,10);
-		if(with_headers)
-		  *response_size += len;
-		
-		if(*response_size > 100000) // no way not enough ram
-		  return -1;
-		ret_str = (char*)calloc((*response_size)+3,sizeof(char));
-		memset( ret_str, 0, (*response_size)+3);
-	      } else {
-		//no len no dice, this is IOT !
-		return -1;
-	      }
-	      if(with_headers){
-		memcpy(ret_str+curr_sz,buf,len);
-		curr_sz+=len;
-		*(ret_str+curr_sz+1)=0;
-	      }
-	      init=0;
+                init=0;
             }
         }
     } while( 1 );
-    
-    free(buf);
+    if(buf != NULL)
+        free(buf);
     return curr_sz;
 
 }
@@ -262,21 +293,96 @@ int read_http_response(char ** response, int * response_size,char with_headers)
 char * sched_str=NULL;
 char * client_cert=NULL;
 
-char * postfile(char * action, char * fieldname,char* filename,char * filecontent)
+char * postdata(const char * action, int fieldnums, char ** fieldnames,char ** content)
 {
-    char * boundary = "BruCONBoundary";
+
+    int len;
+    const char * formath =
+        "POST %s HTTP/1.0\r\n"
+        "Host: "BADGE_HOST "\r\n"
+        "Content-Length: %d\r\n"
+        "Content-Type: application/x-www-form-urlencoded"
+        "\r\n"
+        "\r\n";
+    const char * formatc = "%s=%s&";
+    int i;
+    char * h_buff;
+
+    char * response = NULL;
+
+    char * body = NULL;
+
+    len = 0;
+    for(i=0;i<fieldnums;i++){
+        len += strlen(fieldnames[i]) + strlen(content[i]) + 2;
+
+    }
+    if(len)
+        len--;
+
+
+
+
+
+//    printf("%p %p %d %d %s\n",body,body+len,i,len,body);
+
+    h_buff = (char*)calloc(strlen(formath)+50,sizeof(char));
+    int lenh = sprintf(h_buff,formath,action,len);
+
+    //printf("%s %d\n",h_buff,lenh);
+
+    if(initurl() != 0)
+        return NULL;
+
+    (void) mbedtls_ssl_write( ssl, (unsigned char*)h_buff, lenh);
+
+    free(h_buff);
+    if(fieldnums){
+        body = (char*)calloc(len+2,sizeof(char));
+        len = 0;
+        for(i=0;i<fieldnums;i++){
+            len += sprintf(body+len,formatc,fieldnames[i],content[i]);
+        }
+        len--;
+        *(body+len)=0;
+    }
+    /*if(fieldnums)
+        printf("%s %d\n",body,len);
+    */
+
+    (void) mbedtls_ssl_write( ssl, (unsigned char*)body, len);
+    free(body);
+
+    (void) read_http_response((char **)&response,&len,0);
+    printf("R %p %d\n",response,len);
+
+    mbedtls_ssl_close_notify( ssl );
+    disconnect_ssl();
+
+//    printf("%s %d\n",response,len);
+
+
+
+    return response;
+
+}
+
+
+char * postfile(const char * action, const char * fieldname, const char* filename,const char * filecontent)
+{
+    const char * boundary = "BruCONBoundary";
     int lenc,lenh,len;
 
     char * c_buff, * h_buff;
 
-    char * formath =
+    const char * formath =
         "POST %s HTTP/1.0\r\n"
         "Host: "BADGE_HOST "\r\n"
         "Content-Length: %d\r\n"
         "Content-Type: multipart/form-data; boundary=%s"
         "\r\n"
         "\r\n";
-    char * formatc =
+    const char * formatc =
         "--%s\r\n"
         "Content-Disposition: form-data; name=\"%s\"; filename=\"%s\""
         "\r\n"
@@ -312,34 +418,34 @@ void get_sched_task(void * arg)
 volatile char isgettingsched;
 char * get_sched()
 {
-  int ret;
-  unsigned char buf[512];
-  isgettingsched=1;
-  ret = initurl();
-  if(ret != 0){
+    int ret;
+    unsigned char buf[512];
+    isgettingsched=1;
+    ret = initurl();
+    if(ret != 0){
 #ifdef BRUCON_SSL_VERBOSE
-    printf( " ssl init failed\n" );
+        printf( " ssl init failed\n" );
 #endif
-    netsched = NULL; disconnect_ssl();
-    isgettingsched=0;
-    while(1){ vTaskDelay(10000);
-    }
+        netsched = NULL; disconnect_ssl();
+        isgettingsched=0;
+        while(1){ vTaskDelay(10000);
+        }
 
-  }
-  int len = sprintf((char*)buf,"GET " GETSCHED " HTTP/1.0\r\nHost: "BADGE_HOST "\r\n\r\n" );
-  ret = mbedtls_ssl_write( ssl, buf, len);
-  if(ret < 0){
-    printf("ss error -%04x = %d , %s\n",-ret,len,buf);
-  }
-  ret = read_http_response(&netsched,&len,0);
-  //  printf("\%d %d %d %s\n",ret,len,strlen(sched_str),sched_str);
-  mbedtls_ssl_close_notify( ssl );
-  disconnect_ssl();
-  isgettingsched=0;
-  while(1)  {
-    vTaskDelay(10000);
-  }
-  return NULL;
+    }
+    int len = sprintf((char*)buf,"GET " GETSCHED " HTTP/1.0\r\nHost: "BADGE_HOST "\r\n\r\n" );
+    ret = mbedtls_ssl_write( ssl, buf, len);
+    if(ret < 0){
+        printf("ss error -%04x = %d , %s\n",-ret,len,buf);
+    }
+    ret = read_http_response(&netsched,&len,0);
+    //printf("\%d %d %d %s\n",ret,len,strlen(netsched),netsched);
+
+    disconnect_ssl();
+    isgettingsched=0;
+    while(1)  {
+        vTaskDelay(10000);
+    }
+    return NULL;
 }
 
 int gen_rsakp_and_csr(mbedtls_pk_context * pubkey,unsigned char* buff,uint16_t buffSize)
@@ -360,7 +466,7 @@ int gen_rsakp_and_csr(mbedtls_pk_context * pubkey,unsigned char* buff,uint16_t b
     mbedtls_x509write_csr_set_md_alg( req, MBEDTLS_MD_SHA256 );
     mbedtls_x509write_csr_set_key_usage(req,MBEDTLS_X509_KU_DIGITAL_SIGNATURE);
     mbedtls_x509write_csr_set_ns_cert_type(req,MBEDTLS_X509_NS_CERT_TYPE_SSL_CLIENT);
-    sprintf((char*)buff,"CN=%s",(char*)macstr);
+    sprintf((char*)buff,"L=%s,CN=%s","2019_BruC0N_isN34t!",(char*)macstr);
     ret = mbedtls_x509write_csr_set_subject_name(req,(char*)buff);
     if(ret != 0 ){
         printf("error subject_name : 0x%04X, %s\n",-ret,buff);
@@ -401,56 +507,56 @@ int gen_rsakp_and_csr(mbedtls_pk_context * pubkey,unsigned char* buff,uint16_t b
 volatile char isgeneratingRSA = 1;
 
 void restore_clicert( 	mbedtls_x509_crt ** cert,mbedtls_pk_context ** pk_ctx_dcert  ){
-  char * certstr;
-  char * p_str=NULL;
-  char * q_str=NULL;
-  char * e_str=NULL;
-  mbedtls_mpi t,p,q,e;
-  if( *cert != NULL)
-    return;
-  int ret;
-  *cert=(mbedtls_x509_crt*)calloc(1,sizeof(mbedtls_x509_crt));
-  mbedtls_x509_crt_init( *cert);
-  mbedtls_rsa_context * rsa_ctx_dcert;
-  mbedtls_pk_context * pubkey;
-  pubkey = (mbedtls_pk_context*)calloc(1,sizeof(mbedtls_pk_context));
-  mbedtls_pk_setup( pubkey, mbedtls_pk_info_from_type( MBEDTLS_PK_RSA ));
-  rsa_ctx_dcert =(mbedtls_rsa_context *) pubkey->pk_ctx ;
-  //  mbedtls_rsa_init(rsa_ctx_dcert, MBEDTLS_RSA_PKCS_V15, MBEDTLS_MD_NONE);
+    char * certstr;
+    char * p_str=NULL;
+    char * q_str=NULL;
+    char * e_str=NULL;
+    mbedtls_mpi t,p,q,e;
+    if( *cert != NULL)
+        return;
+    int ret;
+    *cert=(mbedtls_x509_crt*)calloc(1,sizeof(mbedtls_x509_crt));
+    mbedtls_x509_crt_init( *cert);
+    mbedtls_rsa_context * rsa_ctx_dcert;
+    mbedtls_pk_context * pubkey;
+    pubkey = (mbedtls_pk_context*)calloc(1,sizeof(mbedtls_pk_context));
+    mbedtls_pk_setup( pubkey, mbedtls_pk_info_from_type( MBEDTLS_PK_RSA ));
+    rsa_ctx_dcert =(mbedtls_rsa_context *) pubkey->pk_ctx ;
+    //  mbedtls_rsa_init(rsa_ctx_dcert, MBEDTLS_RSA_PKCS_V15, MBEDTLS_MD_NONE);
   
-  getBruCONConfigString("ClientCert",&certstr);
-  getBruCONConfigString("POWER_HISTORY",&p_str);
-  getBruCONConfigString("UNIQUE_ID",&q_str);
-  getBruCONConfigString("EVERSION",&e_str);
-  mbedtls_mpi_init(&q);
-  mbedtls_mpi_init(&p);
-  mbedtls_mpi_init(&e);
+    getBruCONConfigString("ClientCert",&certstr);
+    getBruCONConfigString("POWER_HISTORY",&p_str);
+    getBruCONConfigString("UNIQUE_ID",&q_str);
+    getBruCONConfigString("EVERSION",&e_str);
+    mbedtls_mpi_init(&q);
+    mbedtls_mpi_init(&p);
+    mbedtls_mpi_init(&e);
 
-  mbedtls_mpi_init(&t);  
-  mbedtls_mpi_read_string(&t,16,p_str);
-  mbedtls_mpi_add_int (&p,&t , 1);
+    mbedtls_mpi_init(&t);
+    mbedtls_mpi_read_string(&t,16,p_str);
+    mbedtls_mpi_add_int (&p,&t , 1);
   
-  mbedtls_mpi_init(&t);
-  mbedtls_mpi_read_string(&t,16,q_str);
-  mbedtls_mpi_add_int (&q,&t , 1);
+    mbedtls_mpi_init(&t);
+    mbedtls_mpi_read_string(&t,16,q_str);
+    mbedtls_mpi_add_int (&q,&t , 1);
 
-  mbedtls_mpi_init(&t);
-  mbedtls_mpi_read_string(&t,16,e_str);
-  mbedtls_mpi_add_int (&e,&t , 1);
-  *pk_ctx_dcert = pubkey;
+    mbedtls_mpi_init(&t);
+    mbedtls_mpi_read_string(&t,16,e_str);
+    mbedtls_mpi_add_int (&e,&t , 1);
+    *pk_ctx_dcert = pubkey;
 
-  free(p_str);
-  free(q_str);
-  free(e_str);
+    free(p_str);
+    free(q_str);
+    free(e_str);
 
-  mbedtls_rsa_import(rsa_ctx_dcert,NULL,&p,&q,NULL,&e); 
-  mbedtls_rsa_complete(rsa_ctx_dcert);
-  //  printf("STRS RSA : \n\t%s\n\t%s\n\t%s",e_str,p_str,q_str);
-  //  printf("%s\n",certstr==NULL?"NULL":certstr);
-  if( (ret=mbedtls_x509_crt_parse(*cert,(unsigned char*)certstr,strlen(certstr)+1)) != 0){
-  printf("Error parsing cli cert : %x\n",-ret);
-  }
-  free(certstr);
+    mbedtls_rsa_import(rsa_ctx_dcert,NULL,&p,&q,NULL,&e);
+    mbedtls_rsa_complete(rsa_ctx_dcert);
+    //  printf("STRS RSA : \n\t%s\n\t%s\n\t%s",e_str,p_str,q_str);
+    //  printf("%s\n",certstr==NULL?"NULL":certstr);
+    if( (ret=mbedtls_x509_crt_parse(*cert,(unsigned char*)certstr,strlen(certstr)+1)) != 0){
+        printf("Error restoring cli cert : %x\n",-ret);
+    }
+    free(certstr);
 }
 
 
@@ -491,6 +597,8 @@ void save_rsa(mbedtls_rsa_context * rsa_ctx_dcert)
     mbedtls_mpi_write_string(&res,16,savestr,max,&olen);
     setBruCONConfigString("UNIQUE_ID",savestr);
     //    printf("Q %s\n",savestr);
+    free(savestr);
+
 }
 
 void save_csr(char * buff)
@@ -542,12 +650,12 @@ void task_getclientcert(void * arg)
     char * csr;
     getBruCONConfigString("csr",&csr);
     postfile("/enroll.php","CSR","CSR",csr);
-    //printf("CLICERT:\n%s\n",client_cert);
+    // printf("CLICERT:\n%s\n",client_cert);
     free(csr);
     BruCONErase_key("csr");
     setBruCONConfigFlag("haveClientCert",1);
     setBruCONConfigString("ClientCert",client_cert);
-    //  printf("%s",client_cert);
+    printf("%s",client_cert);
     setBruCONConfigFlag("haveCSR",0);
 
    

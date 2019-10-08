@@ -59,47 +59,27 @@ uint8_t bat_pc()
     // and it is even worse when in bad battery conditon and not chargin...
     uint8_t pc;
     if(batteryinfo.powstat & POWSTAT_USB){
-        
-    if(batteryinfo.vbat > 4100)
         pc=100;
-    if(batteryinfo.vbat < 4090)
-        pc=90;
-    if(batteryinfo.vbat < 4080)
-        pc=80;
-    if(batteryinfo.vbat < 4060)
-        pc=70;
-    if(batteryinfo.vbat < 4040)
-        pc=60;
-    if(batteryinfo.vbat < 4020)
-        pc=50;
-    if(batteryinfo.vbat < 4000)
-        pc=30;
-    if(batteryinfo.vbat < 3980)
-        pc=10;
-    if(batteryinfo.vbat < 3970)
-        pc=5;
-    if(batteryinfo.vbat < 3950)
-        pc=0;
     } else {
-    if(batteryinfo.vbat > 4100)
+    if(batteryinfo.vbat > 2450)
         pc=100;
-    if(batteryinfo.vbat < 4100)
+    if(batteryinfo.vbat < 2400)
         pc=90;
-    if(batteryinfo.vbat < 4090)
+    if(batteryinfo.vbat < 2300)
         pc=80;
-    if(batteryinfo.vbat < 4080)
+    if(batteryinfo.vbat < 2200)
         pc=70;
-    if(batteryinfo.vbat < 4070)
+    if(batteryinfo.vbat < 2000)
         pc=60;
-    if(batteryinfo.vbat < 4060)
+    if(batteryinfo.vbat < 1800)
         pc=50;
-    if(batteryinfo.vbat < 4030)
+    if(batteryinfo.vbat < 1600)
         pc=30;
-    if(batteryinfo.vbat < 4020)
+    if(batteryinfo.vbat < 1400)
         pc=10;
-    if(batteryinfo.vbat < 4010)
+    if(batteryinfo.vbat < 1000)
         pc=5;
-    if(batteryinfo.vbat < 4000)
+    if(batteryinfo.vbat < 800)
         pc=0;
     }
     

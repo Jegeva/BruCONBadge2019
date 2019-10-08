@@ -7,11 +7,11 @@
 
 //void bru_nvs_init();
 
-char getBruCONConfigFlag(char* flag);
-char setBruCONConfigFlag(char* flag,unsigned char flagval);
-char setBruCONConfigString(char * key,char * value);
-char getBruCONConfigString(char * key,char ** value);
-char BruCONErase_key(char* key);
-uint32_t getBruCONConfigUint32(char * flag);
-uint32_t setBruCONConfigUint32(char* flag,uint32_t flagval);
+char getBruCONConfigFlag(const char* flag);
+char setBruCONConfigFlag(const char* flag,unsigned char flagval);
+char setBruCONConfigString(const char * key,char * value);
+char getBruCONConfigString(const char * key,char ** value);
+char BruCONErase_key(const char* key);
+uint32_t getBruCONConfigUint32(const char * flag);
+uint32_t setBruCONConfigUint32(const char* flag,uint32_t flagval);
 #endif

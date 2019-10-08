@@ -23,7 +23,7 @@
 #define COL_RED "\033[1;31m"
 #define COL_STOP "\033[0m"
 
-#define WIFI_CONNECT_TIMEOUT 10
+#define WIFI_CONNECT_TIMEOUT 100
 
 enum GUI_MAIN_STATE_E { GSTATE_INIT, GSTATE_MAIN_MENU, GSTATE_MENU_CLICKED ,GSTATE_FETCHING_SCHED, GSTATE_ENROLLING};
 enum GUI_MAIN_STATE_E main_state= GSTATE_INIT;
@@ -68,7 +68,7 @@ void backlighttimeoutTask()
 {
     while(1){
 
-        vTaskDelay(1000);
+        vTaskDelay(10000);
        
         if(!preventbacklighttimeoutTask)
         if((xTaskGetTickCount()-last_click)>1000){
@@ -85,8 +85,7 @@ void backlighttimeoutTask()
 
 #define WIFI_TIMEOUT 5000
 void wifitimeoutTask()
-{
-    while(1){
+{    while(1){
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         if(wifiIsConnected()){
             // printf("backlighttimeout: %d\n",xTaskGetTickCount()-last_click);
@@ -237,7 +236,7 @@ esp_err_t event_handler(void *ctx, system_event_t *event)
 
 void app_main()
 {
-  printf("Hello world!\n");
+  printf("BruCON Bage 2019\n");
   /* Print chip information */
   esp_chip_info_t chip_info;
   TaskHandle_t Tasktemp;

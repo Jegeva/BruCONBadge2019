@@ -31,6 +31,7 @@ extern const uint8_t server_root_cert_pem_end[]   asm("_binary_server_root_cert_
 
 void get_sched_task(void *);
 char * get_sched();
+char * postdata(const char * action, int fieldnums, char ** fieldnames,char ** content);
 
 extern volatile char isgeneratingRSA;
 extern volatile char isgettingClientCert;

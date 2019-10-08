@@ -2,13 +2,13 @@
 #include "settings.priv.h"
 
 
-char * get_wifi_netname()
+const char * get_wifi_netname()
 {
     return WIFI_SSID;
 
 }
 
-char * get_wifi_pass(    )
+const char * get_wifi_pass(    )
 {
     return WIFI_PASSWORD;
 

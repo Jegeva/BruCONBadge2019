@@ -1,47 +1,67 @@
 [
     {
-	"menutitle":"Schedule",
-	"rank":0,
-	"function":null,
-	"submenus":[
-	    {
-		"menutitle":"03/10",
-		"rank":0,
-		"function":"sched03",
-		"submenus":null
-	    },
-	    {
-		"menutitle":"04/10",
-		"rank":1,
-		"function":"sched04",
-		"submenus":null
-	    },
-	    {
-		"menutitle":"05/10",
-		"rank":2,
-		"function":"sched05",
-		"submenus":null
-	    }
-	]
+	    "menutitle":"Schedule",
+	    "rank":0,
+	    "function":null,
+	    "submenus":[
+	        {
+		        "menutitle":"10/10",
+		        "rank":0,
+		        "function":"sched03",
+		        "submenus":null
+	        },
+	        {
+		        "menutitle":"11/10",
+		        "rank":1,
+		        "function":"sched04",
+		        "submenus":null
+	        }
+	    ]
     },
-    {
-	"menutitle":"Map",
-	"rank":1,
-	"function":null,
-	"submenus":[
-	    {
-		"menutitle":"Map Westvleteren",
-		"rank":0,
-		"function":"MapWest",
-		"submenus":null
-	    },
-	    {
-		"menutitle":"Map Novotel",
-		"rank":1,
-		"function":"MapNovo",
-		"submenus":null
-	    }
+	{
+	    "menutitle":"Beerom0ns",
+	    "rank":1,
+	    "function":null,
+	    "submenus": [
+		    {
+			    "menutitle":"My shelf",
+			    "rank":0,
+			    "function":"beeromonGuiShelf",
+			    "submenus":null
+		    },
+		    {
+                "menutitle":"Look for a fight",
+                "rank":1,
+                "function":"beeromonGuiFight",
+                "submenus":null
 
-	]
+		    }
+		]
+	},
+    {
+	    "menutitle":"Map",
+	    "rank":2,
+	    "function":null,
+	    "submenus":[
+	        {
+		        "menutitle":"Map Westvleteren",
+		        "rank":0,
+		        "function":"MapWest",
+		        "submenus":null
+	        },
+	        {
+		        "menutitle":"Map Novotel",
+		        "rank":1,
+		        "function":"MapNovo",
+		        "submenus":null
+	        }
+		]
+	},
+    {
+		"menutitle":"System Info",
+        "rank":3,
+        "function":"SystemInfo",
+        "submenus":null
+
     }
 ]
