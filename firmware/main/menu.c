@@ -1,9 +1,14 @@
 #include "menu.h"
 #include "nokialcd.h"
 #include "expat.h"
+#include "wifi.h"
 #ifdef CONFIG_HARDWARE_2019
 #include "touch.h"
 #include "math.h"
+#include <soc/soc.h>
+#include "beeromons.h"
+#include <esp_system.h>
+#include "battery.h"
 #endif
 
 uint8_t    menu_dirty    = 1;
@@ -18,8 +23,10 @@ menuItp schedhead_d2;
 menuItp schedhead_d3;
 
 menuItem fakeplaceholder;
+char notaskbar = 0;
 
 void display_skeleton();
+void display_taskbar();
 
 
 void fixparent(menuItp p, menuItp h)
@@ -55,6 +62,7 @@ void sched05(void* arg){
 };
 
 
+
 void MapWest(void* arg){
     fakeplaceholder.parent = currMenuItem;
     currMenuItem = &fakeplaceholder;
@@ -71,9 +79,54 @@ void MapNovo(void* arg){
     skeleton_inited = 0;
 }
 
+void SystemInfoL(void* arg)
+{
+    char * wrkstr = calloc(128,sizeof(char));
+    esp_chip_info_t chip_info;
+    uint8_t mac[6] ;
+    esp_efuse_mac_get_default(mac);
+    esp_chip_info(&chip_info);
+    memset(wrkstr,0,128);
+    lcd_clearB12(B12_WHITE);
+    sprintf(wrkstr,"mac %x:%x:%x:%x:%x:%x",
+            mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+
+    lcd_setStr(wrkstr,16,2,B12_BLACK,B12_WHITE,0,0);
+    sprintf(wrkstr,"%d cores, WiFi%s%s",
+            chip_info.cores,
+            (chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
+            (chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "");
+    lcd_setStr(wrkstr,26,2,B12_BLACK,B12_WHITE,0,0);
+    sprintf(wrkstr,"Freq:%dMHz", APB_CLK_FREQ/(1000*1000));
+    lcd_setStr(wrkstr,36,2,B12_BLACK,B12_WHITE,0,0);
+    sprintf(wrkstr,"bat %d mV %d%%", batteryinfo.vbat,batteryinfo.percent);
+    lcd_setStr(wrkstr,46,2,B12_BLACK,B12_WHITE,0,0);
+    sprintf(wrkstr,"WiFi ssid: %s", WIFI_SSID);
+    lcd_setStr(wrkstr,56,2,B12_BLACK,B12_WHITE,0,0);
+    sprintf(wrkstr,"WiFi pw: %s", WIFI_PASSWORD);
+    lcd_setStr(wrkstr,66,2,B12_BLACK,B12_WHITE,0,0);
+
+    free(wrkstr);
+    display_taskbar();
+
+}
+
+
+
+void SystemInfo(void* arg)
+{
+    fakeplaceholder.parent = currMenuItem;
+    currMenuItem = &fakeplaceholder;
+    SystemInfoL(NULL);
+    lcd_sync();
+    skeleton_inited = 0;
+}
+
+
 void dispSchedItem(void* arg){
     lcd_clearB12(B12_WHITE);
     char * wrkstr = calloc(128,sizeof(char));
+    notaskbar=1;
 
     memset(wrkstr,0,128);
     sprintf(wrkstr,"Loc: %s",currMenuItem->schedloc);
@@ -118,23 +171,45 @@ void dispSchedItem(void* arg){
     lcd_sync();
 }
 
+void beeromonGuiShelf(void * arg)
+{
+    notaskbar=1;
+    fakeplaceholder.parent = currMenuItem;
+    currMenuItem = &fakeplaceholder;
+    beeromonGuiShelfL();
+    lcd_sync();
+    skeleton_inited = 0;
 
-#define AUTHORIZED_FUNC_NBR 5
+}
+void beeromonGuiFight(void* arg)
+{
+    fakeplaceholder.parent = currMenuItem;
+    currMenuItem = &fakeplaceholder;
+    beeromonGuiFightL();
+    lcd_sync();
+    skeleton_inited = 0;
+}
+
+#define AUTHORIZED_FUNC_NBR 7
 
 void * menuAuthorisedFunc[AUTHORIZED_FUNC_NBR] = {
     sched03,
     sched04,
-    sched05,
     MapWest,
     MapNovo,
+    beeromonGuiShelf,
+    beeromonGuiFight,
+    SystemInfo
 };
 
-char * menuAuthorisedFuncName[AUTHORIZED_FUNC_NBR] = {
+const char * menuAuthorisedFuncName[AUTHORIZED_FUNC_NBR] = {
     "sched03",
     "sched04",
-    "sched05",
     "MapWest",
     "MapNovo",
+    "beeromonGuiShelf",
+    "beeromonGuiFight",
+    "SystemInfo"
 };
 
 
@@ -178,6 +253,7 @@ void manage_click_menu(uint32_t value,uint32_t level ){
             return;
         case PIN_BL:
             if(currMenuItem->parent != NULL){
+                notaskbar=0;
                 currMenuItem = currMenuItem->parent;
                 currselected = currMenuItem->rank;
                 menu_dirty    = 1;
@@ -188,8 +264,7 @@ void manage_click_menu(uint32_t value,uint32_t level ){
                 menu_dirty    = 0;
                 currMenuItem->funcp(NULL);
             } else {
-
-                if(currMenuItem->child != NULL){
+               if(currMenuItem->child != NULL){
                     currMenuItem = currMenuItem->child;
                     currselected = currMenuItem->rank;
                     menu_dirty    = 1;
@@ -212,6 +287,7 @@ void manage_click_menu(uint32_t value,uint32_t level ){
             break;
         case PIN_BA:
             if(currMenuItem->parent != NULL){
+                notaskbar=0;
                 currMenuItem = currMenuItem->parent;
                 currselected = currMenuItem->rank;
                 menu_dirty    = 1;
@@ -233,7 +309,9 @@ void manage_click_menu(uint32_t value,uint32_t level ){
             break;
         }
     }
-    if(menu_dirty && ( (value ==PIN_BU ) || ( value == PIN_BD)           ) ){
+    if(menu_dirty){
+
+        if( ( (value ==PIN_BU ) || ( value == PIN_BD)           ) ){
 
         if((currselected != 0) && (((currselected%7)==0)&& (value == PIN_BD) ) ){
             return;
@@ -249,9 +327,14 @@ void manage_click_menu(uint32_t value,uint32_t level ){
         lcd_setStr(currMenuItem->menuText,(((currselected%7)+1)*16)+2,0,B12_WHITE,B12_RED,0,0);
         lcd_setRect(((oldrank%7)+1)*16,0, ((oldrank%7)+1)*16,131, 1, 0);
         lcd_setRect(((currselected%7)+1)*16,0,((currselected%7)+1)*16,131, 1, 0);
-        menu_dirty=0;
+        menu_dirty=1;
         lcd_sync();
+        } else {
+            ;
+
+        }
     }
+
 }
 void * menuAuthorisedFuncByName(char * funcname){
     int i;
@@ -350,11 +433,11 @@ void parserSchedTreeT(menuItp acurrmenuItem,const cJSON* subtree, int depth){
 void parserSchedTree(const cJSON* tree){
     schedhead_d1 = calloc(1,sizeof(struct menuIt));
     schedhead_d2 = calloc(1,sizeof(struct menuIt));
-    schedhead_d3 = calloc(1,sizeof(struct menuIt));
+    //  schedhead_d3 = calloc(1,sizeof(struct menuIt));
 
     parserSchedTreeT(schedhead_d1,tree->child,0);
     parserSchedTreeT(schedhead_d2,tree->child->next,0);
-    parserSchedTreeT(schedhead_d3,tree->child->next->next,0);
+    //parserSchedTreeT(schedhead_d3,tree->child->next->next,0);
 
 }
 cJSON * parserMenuJson(const char* jsonstring,uint8_t issched){
@@ -393,6 +476,9 @@ char used[7];
 
 void display_taskbar()
 {
+    if(notaskbar)
+        return;
+
     uint32_t color = B12_GREEN;
     if( (batteryinfo.powstat & POWSTAT_USB) == 0) {
         color = B12_GREEN;
@@ -418,6 +504,19 @@ void display_taskbar()
         lcd_setRect( 6,108, 6 ,111, 1,B12_WHITE );
         lcd_setRect( 10,108, 10 ,111, 1,B12_WHITE );
     }
+    if(wifiIsConnected()){
+        lcd_setRect(13,10, 15,12, 1, B12_WHITE);
+
+        lcd_setRect(10,8, 11,14, 1, B12_WHITE);
+        lcd_setRect(11,7, 12,8, 1, B12_WHITE);
+        lcd_setRect(11,14, 12,15, 1, B12_WHITE);
+
+        lcd_setRect(7,7, 8,15, 1, B12_WHITE);
+        lcd_setRect(8,6, 9,7,  1, B12_WHITE);
+        lcd_setRect(8,15, 9,16,  1, B12_WHITE);
+
+    }
+
 }
 
 
@@ -447,10 +546,10 @@ void display_skeleton()
         dispmenuitem=dispmenuitem->prev;
     i=0;
     while( (i < 7) && (dispmenuitem != NULL) ){
-        if(used[i]){
+        //if(used[i]){
 
             lcd_setRect(((i+1)*16)+1,0, ((i+2)*16)-1,131, 1, (i== (currselected%7) )?B12_RED:B12_WHITE);
-        }
+            //}
 
         used[i]=1;
         lcd_setStr(dispmenuitem->menuText,((i+1)*16)+2,0,(i==(currselected%7))?B12_WHITE:B12_BLACK,(i==(currselected%7))?B12_RED:B12_WHITE,0,0);

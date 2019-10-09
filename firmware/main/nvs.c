@@ -31,7 +31,7 @@ char bru_nvs_init()
     }
 }
 
-char setBruCONConfigString(char * key,char * value)
+char setBruCONConfigString(const char* key,char * value)
 {
     if(bru_nvs_init() == 0){
         if(nvs_set_str(my_handle,key,value) == 0)
@@ -44,7 +44,7 @@ char setBruCONConfigString(char * key,char * value)
 }
 
 
-char getBruCONConfigFlag(char* flag)
+char getBruCONConfigFlag(const char* flag)
 {
     uint8_t flagval = 0;
     if(bru_nvs_init() == 0){
@@ -54,7 +54,7 @@ char getBruCONConfigFlag(char* flag)
     return -1;
 }
 
-char setBruCONConfigFlag(char* flag,unsigned char flagval)
+char setBruCONConfigFlag(const char* flag,unsigned char flagval)
 {
     if(bru_nvs_init() == 0){
         nvs_set_u8(my_handle, flag, flagval);
@@ -62,7 +62,7 @@ char setBruCONConfigFlag(char* flag,unsigned char flagval)
     }
     return -1;
 }
-uint32_t getBruCONConfigUint32(char * flag)
+uint32_t getBruCONConfigUint32(const char * flag)
 {
     uint32_t flagval = 0;
     if(bru_nvs_init() == 0){
@@ -72,7 +72,7 @@ uint32_t getBruCONConfigUint32(char * flag)
     return -1;
 }
 
-uint32_t setBruCONConfigUint32(char* flag,uint32_t flagval)
+uint32_t setBruCONConfigUint32(const char * flag,uint32_t flagval)
 {
     if(bru_nvs_init() == 0){
         nvs_set_u32(my_handle, flag, flagval);
@@ -80,7 +80,7 @@ uint32_t setBruCONConfigUint32(char* flag,uint32_t flagval)
     }
     return -1;
 }
-char getBruCONConfigString(char* flag, char ** flagval)
+char getBruCONConfigString(const char * flag, char ** flagval)
 {
     if(bru_nvs_init() == 0){
         size_t required_size;
@@ -92,7 +92,7 @@ char getBruCONConfigString(char* flag, char ** flagval)
     return -1;
 }
 
-char BruCONErase_key(char* key)
+char BruCONErase_key(const char* key)
 {
     if(bru_nvs_init() == 0){
         if(nvs_erase_key(my_handle,key)==ESP_OK){
