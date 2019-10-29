@@ -136,7 +136,7 @@ void wificonnect()
             esp_wifi_stop();
 
             ESP_ERROR_CHECK( esp_wifi_start() );
-            esp_wifi_set_max_tx_power(127);
+	      esp_wifi_set_max_tx_power(127);
             ESP_ERROR_CHECK( esp_wifi_connect() );
             while( !bConnected )
                 vTaskDelay(2);

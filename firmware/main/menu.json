@@ -18,29 +18,9 @@
 	        }
 	    ]
     },
-	{
-	    "menutitle":"Beerom0ns",
-	    "rank":1,
-	    "function":null,
-	    "submenus": [
-		    {
-			    "menutitle":"My shelf",
-			    "rank":0,
-			    "function":"beeromonGuiShelf",
-			    "submenus":null
-		    },
-		    {
-                "menutitle":"Look for a fight",
-                "rank":1,
-                "function":"beeromonGuiFight",
-                "submenus":null
-
-		    }
-		]
-	},
     {
 	    "menutitle":"Map",
-	    "rank":2,
+	    "rank":1,
 	    "function":null,
 	    "submenus":[
 	        {
@@ -59,7 +39,7 @@
 	},
     {
 		"menutitle":"System Info",
-        "rank":3,
+        "rank":2,
         "function":"SystemInfo",
         "submenus":null
 

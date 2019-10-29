@@ -36,15 +36,21 @@ extern TickType_t last_click;
 extern volatile char batt_update;
 extern char * netshed;
 extern xQueueHandle gpio_evt_queue ;
+extern menuItem * currMenuItem;
+extern menuItem fakeplaceholder;
 
+
+
+extern void (*volatile menu_mgt_func)(uint32_t,uint32_t);
 
 menuItem * changemenuItem(menuItem *);
 void set_status_bar_text(char * b);
 void defaultmenu();
 void manage_click(uint32_t value,uint32_t level );
+void manage_click_menu_orig(uint32_t value,uint32_t level );
 void manage_click_menu(uint32_t value,uint32_t level );
 void display_taskbar();
-
+extern char notaskbar;
 
 
 

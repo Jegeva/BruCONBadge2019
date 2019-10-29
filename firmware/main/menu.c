@@ -6,7 +6,6 @@
 #include "touch.h"
 #include "math.h"
 #include <soc/soc.h>
-#include "beeromons.h"
 #include <esp_system.h>
 #include "battery.h"
 #endif
@@ -171,34 +170,14 @@ void dispSchedItem(void* arg){
     lcd_sync();
 }
 
-void beeromonGuiShelf(void * arg)
-{
-    notaskbar=1;
-    fakeplaceholder.parent = currMenuItem;
-    currMenuItem = &fakeplaceholder;
-    beeromonGuiShelfL();
-    lcd_sync();
-    skeleton_inited = 0;
 
-}
-void beeromonGuiFight(void* arg)
-{
-    fakeplaceholder.parent = currMenuItem;
-    currMenuItem = &fakeplaceholder;
-    beeromonGuiFightL();
-    lcd_sync();
-    skeleton_inited = 0;
-}
-
-#define AUTHORIZED_FUNC_NBR 7
+#define AUTHORIZED_FUNC_NBR 5
 
 void * menuAuthorisedFunc[AUTHORIZED_FUNC_NBR] = {
     sched03,
     sched04,
     MapWest,
     MapNovo,
-    beeromonGuiShelf,
-    beeromonGuiFight,
     SystemInfo
 };
 
@@ -207,13 +186,17 @@ const char * menuAuthorisedFuncName[AUTHORIZED_FUNC_NBR] = {
     "sched04",
     "MapWest",
     "MapNovo",
-    "beeromonGuiShelf",
-    "beeromonGuiFight",
     "SystemInfo"
 };
 
+void (*volatile menu_mgt_func)(uint32_t,uint32_t);
 
 void manage_click_menu(uint32_t value,uint32_t level ){
+  printf("manage click\n");
+  menu_mgt_func(value,level);
+}
+
+void manage_click_menu_orig(uint32_t value,uint32_t level ){
 
     int oldrank=currselected;
     menuItem * oldmenuitem = currMenuItem;
@@ -440,7 +423,7 @@ void parserSchedTree(const cJSON* tree){
     //parserSchedTreeT(schedhead_d3,tree->child->next->next,0);
 
 }
-cJSON * parserMenuJson(const char* jsonstring,uint8_t issched){
+void parserMenuJson(const char* jsonstring,uint8_t issched){
     cJSON *menu_json = cJSON_Parse(jsonstring);
     int depth = 0;
     if (menu_json == NULL)
@@ -456,8 +439,8 @@ cJSON * parserMenuJson(const char* jsonstring,uint8_t issched){
         menuhead = (menuItp)calloc(1,sizeof(menuItem));
         parserMenuTree(menuhead,menu_json,depth);
     }
-
-    return menu_json;
+    //  cJSON_Delete(menu_json);
+    //    return menu_json;
 }
 
 

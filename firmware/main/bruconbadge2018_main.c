@@ -110,7 +110,7 @@ void gui()
  char get_sched_attempt =0;
  char get_sched_max_attempt =3;
  TickType_t tickstart = xTaskGetTickCount();
-
+ menu_mgt_func = manage_click_menu_orig;
 
  switchbacklight(0);
 
@@ -291,8 +291,8 @@ void app_main()
 
   xTaskCreatePinnedToCore(&gui        , "guiTask" , 8192, NULL, 5| portPRIVILEGE_BIT , NULL,1);
   xTaskCreate(&wificonnect, "wifiTask", 8192, NULL, 0| portPRIVILEGE_BIT, NULL);
-  xTaskCreate(&backlighttimeoutTask, "backlighttimeoutTask", 4096, NULL, 0| portPRIVILEGE_BIT, NULL);
-  xTaskCreate(&wifitimeoutTask, "wifitimeoutTask", 4096, NULL, 0| portPRIVILEGE_BIT, NULL);
+  xTaskCreate(&backlighttimeoutTask, "backlighttimeoutTask", 1024, NULL, 0| portPRIVILEGE_BIT, NULL);
+  xTaskCreate(&wifitimeoutTask, "wifitimeoutTask", 1024, NULL, 0| portPRIVILEGE_BIT, NULL);
 
   while(1)  {
       vTaskDelay(10000);
